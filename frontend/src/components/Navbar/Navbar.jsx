@@ -6,8 +6,8 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="bg-gray-700 shadow-lg">
-      <div className="h-20 mx-auto flex justify-between items-center px-12">
+    <div className="bg-gray-800 shadow-lg">
+      <div className="h-16 mx-auto flex justify-between items-center px-12">
         <div className="flex items-center gap-35">
           <h1 className="text-red-200 text-3xl">eCinema</h1>
           <div className="flex gap-15">
