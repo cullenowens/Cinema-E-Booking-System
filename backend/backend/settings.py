@@ -74,14 +74,14 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     "default": {
-        "ENGINE": "mssql",
+        "ENGINE": "django.db.backends.mysql",
         "NAME": "defaultdb",      # DB name
         "USER": "cinema_user",
         "PASSWORD": "Nathan_asfaw1",
         "HOST": "cinema-db-cinema-ebooking-system.k.aivencloud.com",    # e.g. "localhost" or "192.168.1.100"
         "PORT": "25327",                    # default SQL Server port
         "OPTIONS": {
-            "driver": "ODBC Driver 17 for SQL Server",  
+            "ssl": {'ca':None},  
         },
     }
 }
