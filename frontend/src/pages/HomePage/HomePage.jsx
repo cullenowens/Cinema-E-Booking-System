@@ -1,5 +1,11 @@
 import React from "react";
 import Navbar from "../../components/Navbar/Navbar";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination, Scrollbar, A11y } from "swiper/modules";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
+import "swiper/css/scrollbar";
 
 const HomePage = () => {
   return (
@@ -14,7 +20,21 @@ const HomePage = () => {
           <button>Coming Soon</button>
         </div>
       </div>
-      <hr className="text-white max-w-7xl mx-auto" />
+      <hr className="text-white max-w-7xl mx-auto mb-15" />
+      <Swiper
+        modules={[Navigation]}
+        spaceBetween={50}
+        slidesPerView={3}
+        navigation
+        onSlideChange={() => console.log("slide change")}
+        onSwiper={(swiper) => console.log(swiper)}
+        className="text-center max-w-5xl h-20"
+      >
+        <SwiperSlide>Movie 1</SwiperSlide>
+        <SwiperSlide>Movie 2</SwiperSlide>
+        <SwiperSlide>Movie 3</SwiperSlide>
+        <SwiperSlide>Movie 4</SwiperSlide>
+      </Swiper>
     </div>
   );
 };
