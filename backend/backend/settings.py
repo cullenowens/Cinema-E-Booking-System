@@ -75,11 +75,11 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "mssql",
-        "NAME": "your_database_name",      # DB name
-        "USER": "your_username",
-        "PASSWORD": "your_password",
-        "HOST": "your_sql_server_host",    # e.g. "localhost" or "192.168.1.100"
-        "PORT": "1433",                    # default SQL Server port
+        "NAME": "defaultdb",      # DB name
+        "USER": "cinema_user",
+        "PASSWORD": "Nathan_asfaw1",
+        "HOST": "cinema-db-cinema-ebooking-system.k.aivencloud.com",    # e.g. "localhost" or "192.168.1.100"
+        "PORT": "25327",                    # default SQL Server port
         "OPTIONS": {
             "driver": "ODBC Driver 17 for SQL Server",  
         },
