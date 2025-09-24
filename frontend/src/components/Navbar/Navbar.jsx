@@ -1,40 +1,37 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 const Navbar = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="bg-[#003366] shadow-lg">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="h-20 flex justify-between items-center">
-          <img
-            src="/interface-icon-assets-icon-camera-icon-technology-icon-photo-camera-icon-photograph-icon-text-circle-line-cameras-optics-symbol-png-clipart.jpg"
-            className="h-15"
-          />
+    <div className="bg-gray-700 shadow-lg">
+      <div className="h-20 mx-auto flex justify-between items-center px-12">
+        <div className="flex items-center gap-35">
+          <h1 className="text-red-200 text-3xl">eCinema</h1>
+          <div className="flex gap-15">
+            <button
+              onClick={() => navigate("/")}
+              className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => navigate("/movies")}
+              className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
+            >
+              Movies
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <AccountCircleIcon sx={{ color: "white" }} />
           <button
-            onClick={() => navigate("/showtimes")}
-            className="text-white cursor-pointer"
+            onClick={() => navigate("/signin")}
+            className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
           >
-            SHOWTIMES
-          </button>
-          <button
-            onClick={() => navigate("/promotions")}
-            className="text-white cursor-pointer"
-          >
-            PROMOTIONS
-          </button>
-          <button
-            onClick={() => navigate("/contact")}
-            className="text-white cursor-pointer"
-          >
-            CONTACT
-          </button>
-          <button
-            onClick={() => navigate("/login")}
-            className="text-white cursor-pointer"
-          >
-            LOGIN
+            Sign In
           </button>
         </div>
       </div>
