@@ -73,9 +73,16 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "mssql",
+        "NAME": "your_database_name",      # DB name
+        "USER": "your_username",
+        "PASSWORD": "your_password",
+        "HOST": "your_sql_server_host",    # e.g. "localhost" or "192.168.1.100"
+        "PORT": "1433",                    # default SQL Server port
+        "OPTIONS": {
+            "driver": "ODBC Driver 17 for SQL Server",  
+        },
     }
 }
 
