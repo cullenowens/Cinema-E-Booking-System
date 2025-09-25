@@ -44,14 +44,12 @@ class MovieGenre(models.Model):
 
 class MovieShowtime(models.Model):
     showtime_id = models.AutoField(primary_key=True)
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE)
-    show_date = models.DateField()
-    show_time = models.TimeField()
-    auditorium = models.CharField(max_length=100)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
+    showtime_value = models.TimeField()
 
     class Meta:
         db_table = 'Movie_Showtimes'
         managed = False
 
     def __str__(self):
-        return f"{self.movie.movie_title} - {self.show_date} {self.show_time} in {self.auditorium}"
+        return f"{self.movie.movie_title} - {self.showtime_value}"
