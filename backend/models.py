@@ -1,0 +1,54 @@
+from django.db import models
+
+class Movie(models.Model):
+    movie_id = models.AutoField(primary_key=True)
+    movie_title = models.CharField(max_length=255)
+    movie_description = models.TextField(blank=True, null=True)
+    age_rating = models.CharField(max_length=10, blank=True, null=True)
+    poster_url = models.CharField(max_length=255, blank=True, null=True)
+    trailer_url = models.CharField(max_length=255, blank=True, null=True)
+    movie_status = models.CharField(
+        max_length=50,
+        choices=[
+            ('Now Showing', 'Now Showing'),
+            ('Coming Soon', 'Coming Soon')
+        ],
+        default='Coming Soon'
+    )
+
+    class Meta:
+        db_table = 'movies'
+
+    def __str__(self):
+        return self.movie_title
+    
+class Genre(models.Model):
+    genre_id = models.AutoField(primary_key=True)
+    genre_name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'genres'
+
+    def __str__(self):
+        return self.genre_name
+
+class MovieGenre(models.Model):
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE)
+    genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'movie_genres'
+        unique_together = ('movie', 'genre')
+
+class MovieShowtime(models.Model):
+    showtime_id = models.AutoField(primary_key=True)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE)
+    show_date = models.DateField()
+    show_time = models.TimeField()
+    auditorium = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'movie_showtimes'
+
+    def __str__(self):
+        return f"{self.movie.movie_title} - {self.show_date} {self.show_time} in {self.auditorium}"
