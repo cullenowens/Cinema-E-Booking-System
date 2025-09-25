@@ -28,7 +28,7 @@ class Genre(models.Model):
     genre_name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'Genres'
+        db_table = 'Genre_List'
         managed = False
 
     def __str__(self):
