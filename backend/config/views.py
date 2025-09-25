@@ -12,7 +12,7 @@ def get_all_movies(request):
 
     for movie in movies:
         #for each movie, get its genre and showtime(s)
-        genres = Genre.objects.filter(moviegenre_movie=movie).values_list('genre_name', flat=True)
+        genres = Genre.objects.filter(moviegenre__movie=movie).values_list('genre_name', flat=True)
         showtimes = MovieShowtime.objects.filter(movie=movie).values_list('showtime_value', flat=True)
         #build a dict
         data.append({
@@ -33,7 +33,7 @@ def get_movie_details(request, movie_id):
     """Get movie details by ID"""
 
     movie = get_object_or_404(Movie, pk=movie_id)
-    genres = Genre.objects.filter(moviegenre_movie=movie).values_list('genre_name', flat=True)
+    genres = Genre.objects.filter(moviegenre__movie=movie).values_list('genre_name', flat=True)
     showtimes = MovieShowtime.objects.filter(movie=movie).values_list('showtime_value', flat=True)
 
     data = {
@@ -53,11 +53,11 @@ def get_movie_details(request, movie_id):
 @require_http_methods(["GET"])
 def get_currently_running_movies(request):
     """Get movies that are currently showing"""
-    movies = Movie.objects.filter(movie_status='Now Showing')
+    movies = Movie.objects.filter(movie_status='Currently Running')
     data = []
 
     for movie in movies:
-        genres = Genre.objects.filter(moviegenre_movie=movie).values_list('genre_name', flat=True)
+        genres = Genre.objects.filter(moviegenre__movie=movie).values_list('genre_name', flat=True)
         showtimes = MovieShowtime.objects.filter(movie=movie).values_list('showtime_value', flat=True)
         data.append({
             'movie_id': movie.movie_id,
@@ -73,14 +73,13 @@ def get_currently_running_movies(request):
     return JsonResponse(data, safe=False)
 
 @require_http_methods(["GET"])
-@require_http_methods(["GET"])
 def get_coming_soon_movies(request):
-    """Get movies that are currently showing"""
+    """Get movies that are coming soon"""
     movies = Movie.objects.filter(movie_status='Coming Soon')
     data = []
 
     for movie in movies:
-        genres = Genre.objects.filter(moviegenre_movie=movie).values_list('genre_name', flat=True)
+        genres = Genre.objects.filter(moviegenre__movie=movie).values_list('genre_name', flat=True)
         showtimes = MovieShowtime.objects.filter(movie=movie).values_list('showtime_value', flat=True)
         data.append({
             'movie_id': movie.movie_id,
@@ -105,7 +104,7 @@ def filter_movies_by_genre(request, genre_name):
         data = []
 
         for movie in movies:
-            genres = Genre.objects.filter(moviegenre_movie=movie).values_list('genre_name', flat=True)
+            genres = Genre.objects.filter(moviegenre__movie=movie).values_list('genre_name', flat=True)
             #might not need showtimes, tbd
             # showtimes = MovieShowtime.objects.filter(movie=movie).values_list('showtime_value', flat=True)
             data.append({
@@ -145,7 +144,7 @@ def search_movies_by_name(request):
     data = []
 
     for movie in movies:
-        genres = Genre.objects.filter(moviegenre_movie=movie).values_list('genre_name', flat=True)
+        genres = Genre.objects.filter(moviegenre__movie=movie).values_list('genre_name', flat=True)
         showtimes = MovieShowtime.objects.filter(movie=movie).values_list('showtime_value', flat=True)
         data.append({
             'movie_id': movie.movie_id,
