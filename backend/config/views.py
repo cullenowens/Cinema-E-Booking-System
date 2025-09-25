@@ -2,7 +2,7 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
-from ..models import Movie, Genre, MovieGenre, MovieShowtime
+from models import Movie, Genre, MovieGenre, MovieShowtime
 
 @require_http_methods(["GET"])
 def get_all_movies(request):
