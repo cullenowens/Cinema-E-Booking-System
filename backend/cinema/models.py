@@ -10,14 +10,15 @@ class Movie(models.Model):
     movie_status = models.CharField(
         max_length=50,
         choices=[
-            ('Now Showing', 'Now Showing'),
+            ('Currently Running', 'Currently Running'),
             ('Coming Soon', 'Coming Soon')
         ],
         default='Coming Soon'
     )
 
     class Meta:
-        db_table = 'movies'
+        db_table = 'Movies'
+        managed = False  # Since the table already exists in the database
 
     def __str__(self):
         return self.movie_title
@@ -27,7 +28,8 @@ class Genre(models.Model):
     genre_name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'genres'
+        db_table = 'Genres'
+        managed = False
 
     def __str__(self):
         return self.genre_name
@@ -37,7 +39,7 @@ class MovieGenre(models.Model):
     genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
 
     class Meta:
-        db_table = 'movie_genres'
+        db_table = 'Movie_Genres'
         unique_together = ('movie', 'genre')
 
 class MovieShowtime(models.Model):
@@ -48,7 +50,8 @@ class MovieShowtime(models.Model):
     auditorium = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'movie_showtimes'
+        db_table = 'Movie_Showtimes'
+        managed = False
 
     def __str__(self):
         return f"{self.movie.movie_title} - {self.show_date} {self.show_time} in {self.auditorium}"
