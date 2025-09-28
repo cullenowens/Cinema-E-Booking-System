@@ -11,3 +11,8 @@ export const getFutureMovies = async () => {
   const res = await axios.get(`${url}/coming-soon`);
   return res.data;
 };
+
+export const getMovieDetails = async (id) => {
+  const res = await axios.get(`${url}/${id}`);
+  return res.data;
+};
