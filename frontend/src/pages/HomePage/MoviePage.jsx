@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import { getMovieDetails } from "../api/index";
+import { getMovieDetails } from "../../api/index";
 
 const MoviePage = () => {
   const { id } = useParams();
