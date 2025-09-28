@@ -1,0 +1,13 @@
+import axios from "axios";
+
+const url = "http://127.0.0.1:8000/api/movies";
+
+export const getCurrentMovies = async () => {
+  const res = await axios.get(`${url}/currently_running`);
+  return res.data;
+};
+
+export const getFutureMovies = async () => {
+  const res = await axios.get(`${url}/coming-soon`);
+  return res.data;
+};
