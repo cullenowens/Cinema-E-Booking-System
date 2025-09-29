@@ -1,17 +1,22 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [searchInput, setSearchInput] = useState("");
+
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    setSearchInput(q);
+  }, [searchParams]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     const searchTerm = searchInput.trim();
     if (searchTerm) {
-      setSearchInput("");
       navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
     }
   };
