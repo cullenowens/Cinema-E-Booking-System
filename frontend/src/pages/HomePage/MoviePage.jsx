@@ -5,6 +5,7 @@ import { getMovieDetails } from "../../api/index";
 const MoviePage = () => {
   const { id } = useParams();
   const [movie, setMovie] = useState(null);
+  const [selectedShowtime, setSelectedShowtime] = useState(null);
   useEffect(() => {
     const fetchMovie = async () => {
       try {
@@ -19,6 +20,11 @@ const MoviePage = () => {
       fetchMovie();
     }
   }, [id]);
+
+  const handleShowtimeClick = (time) => {
+    setSelectedShowtime(time);
+    navigate('/booking/${id}?showtime=${time}');
+  };
 
   if (!movie) return <div>Movie not found</div>;
   
@@ -69,12 +75,13 @@ const MoviePage = () => {
               <p className="text-gray-400 text-sm mb-2">Showtimes</p>
               <div className="flex flex-wrap gap-2">
                 {movie.showtimes?.map((time, index) => (
-                  <span 
+                  <button 
                     key={index}
+                    onClick={() => handleShowtimeClick(time)}
                     className="bg-gray-700 px-3 py-1 rounded text-sm"
                   >
                     {time}
-                  </span>
+                  </button>
                 ))}
               </div>
             </div>
