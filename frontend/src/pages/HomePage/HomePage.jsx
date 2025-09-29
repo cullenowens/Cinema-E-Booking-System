@@ -60,17 +60,16 @@ const HomePage = () => {
       <hr className="text-white max-w-7xl mx-auto mb-15" />
       <Swiper
         modules={[Navigation]}
-        spaceBetween={50}
         slidesPerView={3}
         navigation
         pagination={{ clickable: true }}
-        className="text-center max-w-5xl mb-20"
+        className="text-center max-w-7xl mb-20"
       >
         {displayMovies.map((movie, index) => (
           <SwiperSlide key={index}>
             <img
               src={movie.poster_url}
-              className="h-115 cursor-pointer"
+              className="h-115 cursor-pointer mx-auto"
               onClick={() => {
                 navigate(`/movie/${movie.movie_id}`);
               }}
