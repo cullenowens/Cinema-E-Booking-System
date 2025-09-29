@@ -23,7 +23,7 @@ const MoviePage = () => {
 
   const handleShowtimeClick = (time) => {
     setSelectedShowtime(time);
-    print("Button clicked")
+    console.log("Button clicked")
     navigate(`/booking/${id}/${time}`);
   };
 
