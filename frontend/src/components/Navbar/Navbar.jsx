@@ -1,9 +1,20 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 const Navbar = () => {
   const navigate = useNavigate();
+
+  const [searchInput, setSearchInput] = useState("");
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const searchTerm = searchInput.trim();
+    if (searchTerm) {
+      setSearchInput("");
+      navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
+    }
+  };
 
   return (
     <div className="bg-gray-800 shadow-lg">
@@ -17,17 +28,16 @@ const Navbar = () => {
             >
               Home
             </button>
-            <button
-              onClick={() => navigate("/movies")}
-              className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
-            >
-              Movies
-            </button>
-            <input
-              type="text"
-              placeholder="Search for movies..."
-              className="text-gray-500 bg-white rounded-xl pl-2 w-70 pr-2 text-left focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-transparent"
-            />
+
+            <form onSubmit={handleSearchSubmit}>
+              <input
+                type="text"
+                placeholder="Search for movies..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="text-gray-500 bg-white rounded-xl pl-2 w-70 pr-2 text-left focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-transparent"
+              />
+            </form>
           </div>
         </div>
         <div className="flex items-center gap-2">
