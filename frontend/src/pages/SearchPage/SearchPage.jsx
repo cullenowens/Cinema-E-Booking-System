@@ -51,7 +51,12 @@ const SearchPage = () => {
           <option value="Mystery">Mystery</option>
           <option value="Concert">Concert</option>
         </select>
+        <p className="text-white text-lg mt-3">
+          {filteredMovies.length} search results for{" "}
+          <span className="font-semibold text-red-300">"{searchQuery}"</span>
+        </p>
       </div>
+      <div></div>
       <div className="flex gap-20 grid mb-20 grid-cols-4 mx-20 mt-10 ">
         {filteredMovies.map((movie, index) => (
           <img
