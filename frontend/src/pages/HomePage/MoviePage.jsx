@@ -24,7 +24,7 @@ const MoviePage = () => {
   const handleShowtimeClick = (time) => {
     setSelectedShowtime(time);
     print("Button clicked")
-    navigate('/booking/${id}?showtime=${time}');
+    navigate(`/booking/${id}/${time}`);
   };
 
   if (!movie) return <div>Movie not found</div>;
