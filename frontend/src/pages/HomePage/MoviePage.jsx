@@ -23,39 +23,81 @@ const MoviePage = () => {
   if (!movie) return <div>Movie not found</div>;
   
   return (
-    <div className="bg-gray-800 h-450">
-      <h1> {movie.movie_title}</h1>
-      <div className="text-white text-center flex justify-between mt-10 max-w-6xl items-center mx-auto mb-3">
-          <img src={movie.poster_url} alt={movie.movie_title} />
-          <div className="flex gap-5 text-xl">
-             <p><strong>Description:</strong> {movie.movie_description}</p>
-             <p><strong>Rating:</strong> {movie.age_rating}</p>
-            <p><strong>Status:</strong> {movie.movie_status}</p>
-            <p><strong>Genres:</strong> {movie.genres?.join(", ")}</p>
-            <div className="flex gap-5 text-xl">
-              <strong>Showtimes:</strong>
-              <ul>
+    <div className="bg-gray-900 min-h-screen text-white p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <h1 className="text-4xl font-bold mb-6">{movie.movie_title}</h1>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-3 gap-8 h-[calc(100vh-200px)]">
+          
+          {/* Left: Poster */}
+          <div className="col-span-1">
+            <img 
+              src={movie.poster_url} 
+              alt={movie.movie_title}
+              className="w-full h-full object-cover rounded-lg shadow-lg"
+            />
+          </div>
+
+          {/* Middle: Details */}
+          <div className="col-span-1 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div>
+                <p className="text-gray-400 text-sm">Rating</p>
+                <p className="text-xl font-semibold">{movie.age_rating}</p>
+              </div>
+              
+              <div>
+                <p className="text-gray-400 text-sm">Status</p>
+                <p className="text-xl font-semibold">{movie.movie_status}</p>
+              </div>
+              
+              <div>
+                <p className="text-gray-400 text-sm">Genres</p>
+                <p className="text-xl">{movie.genres?.join(", ")}</p>
+              </div>
+              
+              <div>
+                <p className="text-gray-400 text-sm mb-2">Description</p>
+                <p className="text-base leading-relaxed">{movie.movie_description}</p>
+              </div>
+            </div>
+
+            {/* Showtimes at bottom of middle column */}
+            <div className="mt-auto">
+              <p className="text-gray-400 text-sm mb-2">Showtimes</p>
+              <div className="flex flex-wrap gap-2">
                 {movie.showtimes?.map((time, index) => (
-                  <li key={index}>{time}</li>
+                  <span 
+                    key={index}
+                    className="bg-gray-700 px-3 py-1 rounded text-sm"
+                  >
+                    {time}
+                  </span>
                 ))}
-             </ul>
+              </div>
             </div>
           </div>
-      </div>
-      {movie.trailer_url && (
-        <div className="mt-5 text-center">
-          <a> Watch Trailer: </a>
-          <iframe
-            width="560"
-            height="315"
-            src={movie.trailer_url}
-            title="YouTube video player"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          ></iframe>
+
+          {/* Right: Trailer */}
+          <div className="col-span-1">
+            {movie.trailer_url && (
+              <div className="h-full flex flex-col">
+                <p className="text-gray-400 text-sm mb-3">Trailer</p>
+                <iframe
+                  className="w-full flex-1 rounded-lg"
+                  src={movie.trailer_url}
+                  title="Movie Trailer"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
