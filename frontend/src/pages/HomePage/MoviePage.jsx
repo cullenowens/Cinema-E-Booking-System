@@ -23,6 +23,7 @@ const MoviePage = () => {
 
   const handleShowtimeClick = (time) => {
     setSelectedShowtime(time);
+    print("Button clicked")
     navigate('/booking/${id}?showtime=${time}');
   };
 
@@ -78,7 +79,7 @@ const MoviePage = () => {
                   <button 
                     key={index}
                     onClick={() => handleShowtimeClick(time)}
-                    className="bg-gray-700 px-3 py-1 rounded text-sm"
+                    className="bg-gray-700 px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors cursor-pointer"
                   >
                     {time}
                   </button>
