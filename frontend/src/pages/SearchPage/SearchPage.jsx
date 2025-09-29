@@ -31,7 +31,7 @@ const SearchPage = () => {
       <Navbar />{" "}
       <div className=" ml-20 mt-6">
         <select
-          className="p-2 rounded-md"
+          className="bg-gray-700 text-white px-3 py-2 rounded-lg"
           value={selectedGenre}
           onChange={(e) => setSelectedGenre(e.target.value)}
         >
