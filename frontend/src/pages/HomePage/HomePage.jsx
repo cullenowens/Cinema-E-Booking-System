@@ -77,7 +77,7 @@ const HomePage = () => {
           </SwiperSlide>
         ))}
       </Swiper>
-      <div className="text-white ml-95 mt-10 max-w-6xl  mb-3">
+      <div className="text-white ml-48 mt-10 max-w-6xl  mb-3">
         <div className="text-4xl">Movie Trailers</div>
       </div>
       <hr className="text-white max-w-7xl mx-auto mb-15" />
