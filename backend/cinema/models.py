@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 class Movie(models.Model):
@@ -53,3 +54,13 @@ class MovieShowtime(models.Model):
 
     def __str__(self):
         return f"{self.movie.movie_title} - {self.showtime_value}"
+    
+
+class Profile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
+    phone = models.CharField(max_length=20, blank=True)
+    subscribed = models.BooleanField(default=False)         # promotions
+    status = models.CharField(max_length=10, default="Inactive")  # Active/Inactive
+
+    def __str__(self):
+        return f"Profile<{self.user.email}>"

@@ -21,6 +21,16 @@ urlpatterns = [
     path('api/movies/genre/<str:genre_name>/', views.filter_movies_by_genre, name='filter_by_genre'),
 ]
 
+# AUTHENTICATION & PROFILE ENDPOINTS
+from .views_auth import RegisterView, LoginView, LogoutView, ProfileView
+
+urlpatterns += [
+    path("api/auth/register/", RegisterView.as_view(), name="register"),
+    path("api/auth/login/", LoginView.as_view(), name="login"),
+    path("api/auth/logout/", LogoutView.as_view(), name="logout"),
+    path("api/auth/profile/", ProfileView.as_view(), name="profile"),
+]
+
 #Help:
 # Example Frontend Usage:
 # fetch('/api/movies/')                    → get_all_movies()

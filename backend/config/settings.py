@@ -28,7 +28,8 @@ SECRET_KEY = 'django-insecure-_-)3l=o*-i77%&!f7e$jvk39)56=km8b$x=t7jzu8&c78f8^8u
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:5173", "http://localhost:5173"]
 
 
 # Application definition
@@ -41,7 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'cinema',
-    'corsheaders'
+    'corsheaders',
+    'rest_framework',
+    "rest_framework_simplejwt",
+    'django_filters'
 ]
 
 MIDDLEWARE = [
@@ -56,9 +60,19 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",   # Adjust to your frontend dev serverd
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",   # Adjust to your frontend dev serverd
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+}
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 ROOT_URLCONF = 'config.urls'
 
@@ -92,11 +106,13 @@ DATABASES = {
         'HOST': 'cinema-db-cinema-ebooking-system.k.aivencloud.com',
         'PORT': '25327',
         'OPTIONS': {
+            'charset': "utf8mb4",
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'ssl': {
-                'ca': os.path.join(BASE_DIR.parent, 'certs', 'ca.pem')
-            }
+                'ca': os.path.join(BASE_DIR.parent, 'certs', 'ca.pem'),
+            },
         },
+        "CONN_MAX_AGE": 60,  # optional keep-alive
     }
 }
 
