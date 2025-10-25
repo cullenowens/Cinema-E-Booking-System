@@ -1,6 +1,6 @@
 # cinema/urls.py
 from django.urls import path
-from . import views
+from . import views, views_auth
 
 urlpatterns = [
     #path('admin/', admin.site.urls), commenting out for now as we don't have admin setup
@@ -22,13 +22,19 @@ urlpatterns = [
 ]
 
 # AUTHENTICATION & PROFILE ENDPOINTS
-from .views_auth import RegisterView, LoginView, LogoutView, ProfileView
 
 urlpatterns += [
-    path("api/auth/register/", RegisterView.as_view(), name="register"),
-    path("api/auth/login/", LoginView.as_view(), name="login"),
-    path("api/auth/logout/", LogoutView.as_view(), name="logout"),
-    path("api/auth/profile/", ProfileView.as_view(), name="profile"),
+    path("api/auth/register/", views_auth.RegisterView.as_view(), name="register"),
+    path("api/auth/login/", views_auth.LoginView.as_view(), name="login"),
+    path("api/auth/logout/", views_auth.LogoutView.as_view(), name="logout"),
+    path("api/auth/profile/", views_auth.ProfileView.as_view(), name="profile"),
+    
+    # address endpoint for user address management
+    path('api/auth/address/', views_auth.AddressView.as_view(), name='address'),
+    
+    # payment card endpoints for user payment methods
+    path('api/auth/payment-cards/', views_auth.PaymentCardView.as_view(), name='payment_cards'),
+    path('api/auth/payment-cards/<int:pk>/', views_auth.PaymentCardDetailView.as_view(), name='payment_card_detail'),
 ]
 
 #Help:
