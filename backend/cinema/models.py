@@ -64,3 +64,13 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"Profile<{self.user.email}>"
+    
+class Promotion(models.Model):
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='promotions')
+    movie_title = models.CharField(max_length=255)
+    movie_description = models.TextField(blank=True, null=True)
+    discount_percentage = models.IntegerField()
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Promotion<{self.movie_title} - {self.discount_percentage}%>"

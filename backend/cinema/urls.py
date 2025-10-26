@@ -1,11 +1,16 @@
 # cinema/urls.py
 from django.urls import path
-from . import views
+from . import views, admin_views
 
 urlpatterns = [
-    #path('admin/', admin.site.urls), commenting out for now as we don't have admin setup
+    #Admin Movies
+    path('admin/movies/', admin_views.AdminMovieView.as_view(), name='admin-add-movie'),        # POST to add
+    path('admin/movies/<int:pk>/', admin_views.AdminMovieView.as_view(), name='admin-remove-movie'),  # DELETE to remove
+    #Admin Promotions
+    path('admin/promotions/', admin_views.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
+    path('admin/promotions/<int:pk>/', admin_views.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
     #basic movie endpoints, no parameters necessary
-    #j GET /api/movies/ - get all movies with details
+    #GET /api/movies/ - get all movies with details
     path('api/movies/', views.get_all_movies, name='get_all_movies'),
     #GET /api/movies/currently_running - get currently running movies
     path('api/movies/currently_running/', views.get_currently_running_movies, name='currently_running'),
