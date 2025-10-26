@@ -5,10 +5,11 @@ import SearchPage from "./pages/SearchPage/SearchPage";
 import BookingPage from "./pages/BookingPage/BookingPage";
 import SignInPage from "./pages/SignInPage/SignInPage";
 import RegisterPage from "./pages/RegisterPage/RegisterPage";
+import { AuthProvider } from "./contexts/AuthContext";
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Router>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -19,7 +20,7 @@ function App() {
           <Route path="/booking/:id/:showtime" element={<BookingPage />} />
         </Routes>
       </Router>
-    </>
+    </AuthProvider>
   );
 }
 

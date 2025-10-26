@@ -1,10 +1,16 @@
 import React, { useState } from "react";
 import EmailIcon from "@mui/icons-material/Email";
+import PersonIcon from "@mui/icons-material/Person";
 import LockIcon from "@mui/icons-material/Lock";
+import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const RegisterPage = () => {
+  const { register } = useAuth();
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-    fullName: "",
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -12,6 +18,7 @@ const RegisterPage = () => {
 
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [promotions, setPromotions] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -20,6 +27,15 @@ const RegisterPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
+
+    if (!formData.username) {
+      newErrors.username = "Username is required";
+    } else if (formData.username.length < 3) {
+      newErrors.username = "Username must be at least 3 characters";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      newErrors.username =
+        "Username can only contain letters, numbers, and underscores";
+    }
 
     if (!formData.email) {
       newErrors.email = "Email is required";
@@ -43,19 +59,27 @@ const RegisterPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ type: "", text: "" });
 
-    if (validateForm()) {
+    if (!validateForm()) return;
+
+    const res = await register(
+      formData.username,
+      formData.email,
+      formData.password
+    );
+
+    if (res.success) {
       setMessage({
         type: "success",
         text: "Account created successfully! Redirecting to sign in...",
       });
 
-      setTimeout(() => {
-        window.location.href = "/signin";
-      }, 2000);
+      navigate("/signin");
+    } else {
+      setMessage({ type: "error", text: res.error });
     }
   };
 
@@ -93,6 +117,31 @@ const RegisterPage = () => {
           <div className="space-y-6">
             <div>
               <label
+                htmlFor="username"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Username <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <PersonIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
+                <input
+                  type="text"
+                  id="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  className={`w-full pl-10 pr-4 py-3 bg-gray-700 border ${
+                    errors.username ? "border-red-500" : "border-gray-600"
+                  } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition`}
+                  placeholder="Choose a username"
+                />
+              </div>
+              {errors.username && (
+                <p className="mt-2 text-sm text-red-400">{errors.username}</p>
+              )}
+            </div>
+
+            <div>
+              <label
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-300 mb-2"
               >
@@ -116,7 +165,6 @@ const RegisterPage = () => {
               )}
             </div>
 
-            {/* Password */}
             <div>
               <label
                 htmlFor="password"
@@ -170,6 +218,18 @@ const RegisterPage = () => {
                 </p>
               )}
             </div>
+
+            <label className="flex items-center cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={promotions}
+                onChange={(e) => setPromotions(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="ml-2 text-sm text-gray-300 group-hover:text-white transition">
+                Register for promotions?
+              </span>
+            </label>
 
             <button
               onClick={handleSubmit}
