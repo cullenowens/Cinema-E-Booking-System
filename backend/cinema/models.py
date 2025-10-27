@@ -1,5 +1,8 @@
 from django.conf import settings
 from django.db import models
+from cryptography.fernet import Fernet
+import base64
+from datetime import datetime
 
 class Movie(models.Model):
     movie_id = models.AutoField(primary_key=True)
@@ -108,6 +111,9 @@ class PaymentCard(models.Model):
     # just to look cool
     def get_masked_card_number(self):
         """Return masked card number for display"""
+        card_number = self.get_card_number()  # Get the real number
+        if card_number and len(card_number) >= 4:
+            return f"****-****-****-{card_number[-4:]}"  # Show last 4 digits
         return "****-****-****-****"
 
     # check if card is expired
@@ -120,5 +126,24 @@ class PaymentCard(models.Model):
             return exp_date < datetime.now()
         except:
             return True
+    
+    def set_card_number(self, card_number):
+        """encrypt and store card number"""
+        try:
+            cipher = Fernet(settings.CARD_ENCRYPTION_KEY.encode())
+            encrypted_data = cipher.encrypt(card_number.encode())
+            self.card_number_enc = base64.urlsafe_b64encode(encrypted_data).decode()
+        except Exception as e:
+            raise ValueError(f"Encryption failed: {str(e)}")
 
-        
+
+    def get_card_number(self):
+        """decrypt and return card number (for internal use only)"""
+        if not self.card_number_enc:
+            return None
+        try:
+            cipher = Fernet(settings.CARD_ENCRYPTION_KEY.encode())
+            encrypted_data = base64.urlsafe_b64decode(self.card_number_enc.encode())
+            return cipher.decrypt(encrypted_data).decode()
+        except Exception:
+            return None    

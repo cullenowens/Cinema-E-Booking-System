@@ -51,6 +51,9 @@ class PaymentCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentCard
         fields = ['id', 'brand', 'expiration', 'card_number', 'masked_card_number', 'is_expired']
+        extra_kwargs = {
+            'card_number_enc': {'write_only': True},
+        }
 
     # getter method to return masked card number
     def get_masked_card_number(self, obj):
@@ -64,52 +67,65 @@ class PaymentCardSerializer(serializers.ModelSerializer):
     
     # method to validate card number format and return cleaned number
     def validate_card_number(self, value):
-        """Validate card number format"""
-        # first remove spaces and dashes from input
-        clean_number = ''.join(value.split()).replace('-', '')
-        
-        # checks the length and if all characters are digits
-        if not clean_number.isdigit() or len(clean_number) < 13 or len(clean_number) > 19:
-            raise serializers.ValidationError("Invalid card number format")
-        
-        return clean_number
+        """validate card number format before encryption"""
+        # remove spaces, dashes, and other non-digit characters
+        card_number = ''.join(filter(str.isdigit, value))
+    
+        # check if we have any digits left
+        if not card_number:
+            raise serializers.ValidationError("Card number must contain digits")
+    
+        # check length (most cards are 13-19 digits)
+        if len(card_number) < 13 or len(card_number) > 19:
+            raise serializers.ValidationError("Card number must be between 13 and 19 digits")
+    
+        return card_number
     
     # method to validate expiration date format MM/YYYY and check if expired
     def validate_expiration(self, value):
-        """Validate MM/YYYY format"""
-        if '/' not in value or len(value) != 7:
-            raise serializers.ValidationError("Expiration must be in MM/YYYY format")
-        
+        """Validate expiration date format MM/YYYY"""
         try:
-            month, year = value.split('/')
-            month, year = int(month), int(year)
-            
-            #check to see if month is valid
-            if month < 1 or month > 12:
-                raise serializers.ValidationError("Invalid month")
-                
-            from datetime import datetime
-            # check if year is in the past to signify expiration
-            if year < datetime.now().year:
-                raise serializers.ValidationError("Card is expired")
-                
-        except ValueError:
-            raise serializers.ValidationError("Invalid expiration format")
+            # check format to see if it is MM/YYYY
+            if '/' not in value or len(value) != 7:
+                raise serializers.ValidationError("Expiration must be in MM/YYYY format")
         
-        return value
+            month, year = value.split('/')
+            month = int(month)
+            year = int(year)
+        
+            # check month range 01-12
+            if month < 1 or month > 12:
+                raise serializers.ValidationError("Month must be between 01 and 12")
+        
+            # check if card is already expired
+            from datetime import datetime
+            current_year = datetime.now().year
+            current_month = datetime.now().month
+        
+            if year < current_year or (year == current_year and month < current_month):
+                raise serializers.ValidationError("Card cannot be expired")
+            
+            return value
+        except ValueError:
+            raise serializers.ValidationError("Expiration must be in MM/YYYY format")
     
     # method to create PaymentCard instance with encrypted card number
     def create(self, validated_data):
-        """Create payment card with encryption"""
-        # gets the card number from validated data and "encrypts" it by only storing last 4 digits
+        """create payment card with REAL encryption"""
+        # extract card number before creating the card
         card_number = validated_data.pop('card_number')
-        validated_data['card_number_enc'] = f"ENC_{card_number[-4:]}"  # store last 4 digits
-        
-        # goes to the current user from request context and assigns it to the card
+    
+        # add user from request context
         validated_data['user'] = self.context['request'].user
-        
-        # calls the parent create method to save the instance
-        return super().create(validated_data)
+    
+        # create card with other fields (user, brand, expiration)
+        card = PaymentCard.objects.create(**validated_data)
+    
+        # uses the model method to set encrypted card number
+        card.set_card_number(card_number)
+        card.save()
+    
+        return card
     
     # method to update PaymentCard instance (no card number changes allowed for security)
     def update(self, instance, validated_data):

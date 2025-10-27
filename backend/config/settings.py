@@ -14,6 +14,8 @@ from pathlib import Path
 import os
 import pymysql
 pymysql.install_as_MySQLdb()
+# Payment Card Encryption
+from cryptography.fernet import Fernet
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -157,3 +159,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Encryption key for payment cards
+# In production, store this in environment variables for security!
+CARD_ENCRYPTION_KEY = os.environ.get(
+    'CARD_ENCRYPTION_KEY', 
+    'xFcbU7nR8wJ3tY6vA9sD2gK5hN8bE1mC4oP7qT0wZ3x='  # Default key for development
+)

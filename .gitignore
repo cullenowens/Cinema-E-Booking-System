@@ -36,9 +36,45 @@ db.sqlite3-journal
 # VS Code
 .vscode/
 
-# OS
+# OS Specific Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Environment variables
 .env
+.env.local
+.env.production
+
+# Test Files
+test_api.http
+*.http
+
+# Node.js (for frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# JWT Secret Keys (security)
+jwt_secret.txt
+*.key
+*.pem
