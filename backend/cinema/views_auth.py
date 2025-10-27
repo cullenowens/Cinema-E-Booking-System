@@ -12,6 +12,7 @@ from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer
 # --- Registration ---
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
+    print("RegisterView initialized.")
     def perform_create(self, serializer):
         print("Registering new user...")
         user = serializer.save()
