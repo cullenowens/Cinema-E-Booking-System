@@ -74,7 +74,7 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 #Mailgun settings
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 print(EMAIL_BACKEND)
 EMAIL_HOST = os.getenv("EMAIL_HOST")
 print(EMAIL_HOST)
