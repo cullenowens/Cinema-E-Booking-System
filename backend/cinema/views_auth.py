@@ -11,8 +11,9 @@ from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer
 
 # --- Registration ---
 class RegisterView(generics.CreateAPIView):
+    print("Working here before serializer init")
     serializer_class = RegisterSerializer
-
+    print("Working here after serializer init")
     def perform_create(self, serializer):
         user = serializer.save()
         #false until they log in
