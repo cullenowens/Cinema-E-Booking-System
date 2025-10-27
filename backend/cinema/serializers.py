@@ -23,11 +23,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ["username", "email", "password", "first_name", "last_name", "subscribed"]
 
-    def create(self, validated_data):
+    def perform_create(self, validated_data):
         subscribed = validated_data.pop("subscribed", False)
         user = User.objects.create_user(**validated_data)
         Profile.objects.create(user=user, subscribed=subscribed, status="Inactive")
         return user
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            print(serializer.errors)  # <-- this will tell you exactly what’s wrong
+        serializer.is_valid(raise_exception=True)
+        return super().create(request, *args, **kwargs)
     
 class AdminRegisterSerializer(serializers.ModelSerializer):
     #for crearting admin users
