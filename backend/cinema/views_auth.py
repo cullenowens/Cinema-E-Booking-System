@@ -20,13 +20,16 @@ class RegisterView(generics.CreateAPIView):
         user.save()
         #link to verification
         verfication_link = f"http://localhost:5173/api/verify/"
-        send_mail(
-            "Confirm your CES account",
-            "Thank you for registering! Please click the link to verify your account: " + verfication_link,
-            "no-reply@ces.com",
-            [user.email],
-            fail_silently=False,
-        )
+        try:
+            send_mail(
+                "Confirm your CES account",
+                "Thank you for registering! Please click the link to verify your account: " + verfication_link,
+                "no-reply@ces.com",
+                [user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            print(f"Error sending email: {e}")
 
 # --- Login ---
 class LoginView(APIView):
