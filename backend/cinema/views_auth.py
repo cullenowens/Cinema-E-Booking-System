@@ -15,9 +15,14 @@ class RegisterView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         user = serializer.save()
+        #false until they log in
+        user.is_active = False
+        user.save()
+        #link to verification
+        verfication_link = f"http://localhost:8000/api/verify/"
         send_mail(
             "Confirm your CES account",
-            "Thank you for registering! (In dev mode, email is printed to console)",
+            "Thank you for registering! Please click the link to verify your account: " + verfication_link,
             "no-reply@ces.com",
             [user.email],
             fail_silently=True,
