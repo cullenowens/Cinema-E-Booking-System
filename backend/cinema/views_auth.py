@@ -22,8 +22,8 @@ class RegisterView(generics.CreateAPIView):
         user.save()
         print("Saved user")
         #link to verification
-        verfication_link = f"http://localhost:5173/api/verify/"
-        print(f"Verification link: {verfication_link}")
+        verification_link = f"http://localhost:5173/api/verify/"
+        print(f"Verification link: {verification_link}")
         #creates a six digit int
         rand_int = "123456"
         try:
@@ -32,9 +32,17 @@ class RegisterView(generics.CreateAPIView):
             #start TLS for security
             s.starttls()
             #authentication
+            print(os.getenv("GMAIL_PASS"))
             s.login("cullenowens2005@gmail.com", os.getenv("GMAIL_PASS"))
             #message
-            message = f"Subject: CES Account Verification\n\nPlease verify your account by clicking the following link: {verfication_link}\nYour verification code is: {rand_int}"
+            message = (
+                f"Subject: CES Account Verification\n\n"
+                f"Hello {user.username},\n\n"
+                f"Please verify your account by clicking the following link:\n"
+                f"{verification_link}\n\n"
+                f"Your verification code is: {rand_int}\n\n"
+                f"Thank you,\nCES Team"
+            )
             #sending the mail
             s.sendmail("cullenowens2005@gmail.com", user.email, message)
             s.quit()
