@@ -14,6 +14,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
     def perform_create(self, serializer):
+        print(serializer.errors)
         user = serializer.save()
         #false until they log in
         user.is_active = False
