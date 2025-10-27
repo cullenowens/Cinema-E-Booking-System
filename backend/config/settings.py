@@ -75,17 +75,11 @@ REST_FRAMEWORK = {
 }
 #Mailgun settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-print(EMAIL_BACKEND)
 EMAIL_HOST = os.getenv("EMAIL_HOST")
-print(EMAIL_HOST)
 EMAIL_PORT = 587
-print(EMAIL_PORT)
 EMAIL_USE_TLS = True
-print(EMAIL_USE_TLS)
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-print(EMAIL_HOST_USER)
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-print(EMAIL_HOST_PASSWORD)
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 ROOT_URLCONF = 'config.urls'

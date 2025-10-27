@@ -1,3 +1,5 @@
+import os
+import smtplib
 from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 from rest_framework.views import APIView
@@ -12,9 +14,7 @@ from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer
 # --- Registration ---
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
-    print("RegisterView initialized.")
     def perform_create(self, serializer):
-        print("Registering new user...")
         user = serializer.save()
         print(f"User {user.username} registered successfully.")
         #false until they log in
@@ -24,14 +24,21 @@ class RegisterView(generics.CreateAPIView):
         #link to verification
         verfication_link = f"http://localhost:5173/api/verify/"
         print(f"Verification link: {verfication_link}")
+        #creates a six digit int
+        rand_int = "123456"
         try:
-            send_mail(
-                "Confirm your CES account",
-                "Thank you for registering! Please click the link to verify your account: " + verfication_link,
-                "no-reply@ces.com",
-                [user.email],
-                fail_silently=False,
-            )
+            #smtp session created
+            s = smtplib.SMTP('smtp.mailgun.org', 587)
+            #start TLS for security
+            s.starttls()
+            #authentication
+            s.login("cullenowens2005@gmail.com", os.getenv("GMAIL_PASS"))
+            #message
+            message = f"Subject: CES Account Verification\n\nPlease verify your account by clicking the following link: {verfication_link}\nYour verification code is: {rand_int}"
+            #sending the mail
+            s.sendmail("cullenowens2005@gmail.com", user.email, message)
+            s.quit()
+
         except Exception as e:
             print(f"Error sending email: {e}")
 
