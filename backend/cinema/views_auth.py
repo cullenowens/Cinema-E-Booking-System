@@ -28,7 +28,7 @@ class RegisterView(generics.CreateAPIView):
         rand_int = "123456"
         try:
             #smtp session created
-            s = smtplib.SMTP('smtp.mailgun.org', 587)
+            s = smtplib.SMTP('smtp.gmail.com', 587)
             #start TLS for security
             s.starttls()
             #authentication
