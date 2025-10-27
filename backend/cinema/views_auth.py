@@ -25,7 +25,7 @@ class RegisterView(generics.CreateAPIView):
             "Thank you for registering! Please click the link to verify your account: " + verfication_link,
             "no-reply@ces.com",
             [user.email],
-            fail_silently=True,
+            fail_silently=False,
         )
 
 # --- Login ---
