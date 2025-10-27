@@ -18,6 +18,9 @@ class PromotionSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     subscribed = serializers.BooleanField(write_only=True, required=False, default=False)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+
 
     class Meta:
         model = User
