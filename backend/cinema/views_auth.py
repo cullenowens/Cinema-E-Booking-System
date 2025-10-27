@@ -20,8 +20,10 @@ class RegisterView(generics.CreateAPIView):
         #false until they log in
         user.is_active = False
         user.save()
+        print("Saved user")
         #link to verification
         verfication_link = f"http://localhost:5173/api/verify/"
+        print(f"Verification link: {verfication_link}")
         try:
             send_mail(
                 "Confirm your CES account",
