@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useActionData, useNavigate, useSearchParams } from "react-router-dom";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import { useAuth } from "../../contexts/AuthContext";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
   const [searchInput, setSearchInput] = useState("");
 
+  const { user } = useAuth();
+
+  console.log(user);
   useEffect(() => {
     const q = searchParams.get("q") || "";
     setSearchInput(q);
@@ -47,12 +50,21 @@ const Navbar = () => {
         </div>
         <div className="flex items-center gap-2">
           <AccountCircleIcon sx={{ color: "white" }} />
-          <button
-            onClick={() => navigate("/signin")}
-            className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
-          >
-            Sign In
-          </button>
+          {user ? (
+            <button
+              onClick={() => navigate("/profile")}
+              className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
+            >
+              {user.username}
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate("/signin")}
+              className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
+            >
+              Sign In
+            </button>
+          )}
         </div>
       </div>
     </div>

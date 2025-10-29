@@ -1,12 +1,19 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { verifyUser } from "../../api";
 
 const VerifyPage = () => {
-  const [verificationCode, setVerificationCode] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const [verificationCode, setVerificationCode] = useState("");
+
+  const searchParams = new URLSearchParams(location.search);
+  const email = searchParams.get("email");
+
   const handleSubmit = async () => {
     try {
-      // call API
+      verifyUser(email, verificationCode);
       console.log(verificationCode);
       navigate("/signin");
     } catch (error) {

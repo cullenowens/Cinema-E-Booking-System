@@ -34,7 +34,7 @@ urlpatterns += [
     path("api/auth/login/", LoginView.as_view(), name="login"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
     path("api/auth/profile/", ProfileView.as_view(), name="profile"),
-    path('auth/verify/', verify_email, name='verify_email'),
+    path('api/auth/verify/', verify_email, name='verify_email'),
 ]
 
 #Help:
