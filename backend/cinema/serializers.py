@@ -49,6 +49,7 @@ class AdminRegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+    remember_me = serializers.BooleanField(required=False, default=False)
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
