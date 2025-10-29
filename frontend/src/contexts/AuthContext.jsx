@@ -40,12 +40,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, email, password) => {
+  const register = async (username, email, password, phone, subscribed) => {
     try {
       const res = await axios.post(`${API_URL}/register/`, {
         username,
         email,
         password,
+        phone,
+        subscribed,
       });
       return { success: true };
     } catch (error) {

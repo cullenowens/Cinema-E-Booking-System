@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import EmailIcon from "@mui/icons-material/Email";
 import PersonIcon from "@mui/icons-material/Person";
 import LockIcon from "@mui/icons-material/Lock";
+import PhoneIcon from "@mui/icons-material/Phone";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -12,13 +13,14 @@ const RegisterPage = () => {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
+    phone: "",
     password: "",
     confirmPassword: "",
+    promotions: false,
   });
 
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState({ type: "", text: "" });
-  const [promotions, setPromotions] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -41,6 +43,12 @@ const RegisterPage = () => {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
+    }
+
+    if (!formData.phone) {
+      newErrors.phone = "Phone number is required";
+    } else if (!/^\+?[0-9]{7,15}$/.test(formData.phone)) {
+      newErrors.phone = "Please enter a valid phone number";
     }
 
     if (!formData.password) {
@@ -68,7 +76,9 @@ const RegisterPage = () => {
     const res = await register(
       formData.username,
       formData.email,
-      formData.password
+      formData.password,
+      formData.phone,
+      formData.promotions
     );
 
     if (res.success) {
@@ -167,6 +177,31 @@ const RegisterPage = () => {
 
             <div>
               <label
+                htmlFor="phone"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Phone Number <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <PhoneIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
+                <input
+                  type="tel"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className={`w-full pl-10 pr-4 py-3 bg-gray-700 border ${
+                    errors.phone ? "border-red-500" : "border-gray-600"
+                  } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition`}
+                  placeholder="Enter your phone number"
+                />
+              </div>
+              {errors.phone && (
+                <p className="mt-2 text-sm text-red-400">{errors.phone}</p>
+              )}
+            </div>
+
+            <div>
+              <label
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-300 mb-2"
               >
@@ -222,8 +257,10 @@ const RegisterPage = () => {
             <label className="flex items-center cursor-pointer group">
               <input
                 type="checkbox"
-                checked={promotions}
-                onChange={(e) => setPromotions(e.target.checked)}
+                checked={formData.promotions}
+                onChange={(e) =>
+                  setFormData({ ...formData, promotions: e.target.checked })
+                }
                 className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
               />
               <span className="ml-2 text-sm text-gray-300 group-hover:text-white transition">
