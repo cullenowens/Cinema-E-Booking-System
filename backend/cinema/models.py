@@ -62,6 +62,7 @@ class Profile(models.Model):
     subscribed = models.BooleanField(default=False)         # promotions
     status = models.CharField(max_length=10, default="Inactive")  # Active/Inactive
     verification_code = models.CharField(max_length=6, null=True, blank=True)
+    verification_code_created_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Profile<{self.user.email}>"
