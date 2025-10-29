@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from datetime import timedelta
 from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
 from .models import Profile
@@ -102,6 +103,12 @@ class LoginView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         refresh = RefreshToken.for_user(user)
+        #getting remember_me from data
+        remember_me = s.validated_data.get("remember_me", False)
+
+        if remember_me:
+            refresh.set_exp(lifetime=timedelta(days=7))
+        #otherwise default settings
         return Response({
             "refresh": str(refresh),
             "access": str(refresh.access_token),
