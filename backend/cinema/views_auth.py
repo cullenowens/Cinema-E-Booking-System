@@ -43,7 +43,7 @@ class RegisterView(generics.CreateAPIView):
             return
         
         #link to verification
-        verification_link = f"http://localhost:5173/verify/"
+        verification_link = f"http://localhost:5173/verify?email={user.email}"
         print(f"Verification link: {verification_link}")
         
         try:
