@@ -1,5 +1,6 @@
 import os
 import smtplib
+import random
 from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 from rest_framework.views import APIView
@@ -7,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
 from .models import Profile
 from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer
@@ -14,41 +16,73 @@ from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer
 # --- Registration ---
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
+
     def perform_create(self, serializer):
         user = serializer.save()
-        print(f"User {user.username} registered successfully.")
-        #false until they log in
+        # prints for debugging
+        print("User registered successfully!:", user.username)
+        
+        # will be inactive until email verified
         user.is_active = False
         user.save()
-        print("Saved user")
+        print("User is inactive until email is verified.")
+
+        # generate random 6-digit verification code
+        verification_code = str(random.randint(100000, 999999))
+        print(f"Generated verification code: {verification_code}")
+
+        # create/get profile and save verification code
+        try:
+            profile, created = Profile.objects.get_or_create(user=user)
+            profile.verification_code = verification_code
+            profile.status = "Inactive"  # status set to Inactive
+            profile.save()
+            print(f"Verification code saved to database: {verification_code}")
+        except Exception as e:
+            print(f"Error saving verification code: {e}")
+            return
+        
         #link to verification
-        verification_link = f"http://localhost:5173/api/verify/"
+        verification_link = f"http://localhost:5173/verify?email={user.email}"
         print(f"Verification link: {verification_link}")
-        #creates a six digit int
-        rand_int = "123456"
+        
         try:
             #smtp session created
             s = smtplib.SMTP('smtp.gmail.com', 587)
             #start TLS for security
             s.starttls()
+
+            # Get Gmail credentials from environment variables
+            gmail_email = os.getenv("GMAIL_EMAIL")
+            gmail_password = os.getenv("GMAIL_PASS")
+
             #authentication
-            print(os.getenv("GMAIL_PASS"))
-            s.login("cullenowens2005@gmail.com", os.getenv("GMAIL_PASS"))
+            print(f"Gmail email: {gmail_email}")
+            print(f"Gmail password loaded: {'Yes' if gmail_password else 'No'}")
+
+            # login to gmail
+            s.login(gmail_email, gmail_password)
+
             #message
             message = (
                 f"Subject: CES Account Verification\n\n"
                 f"Hello {user.username},\n\n"
-                f"Please verify your account by clicking the following link:\n"
-                f"{verification_link}\n\n"
-                f"Your verification code is: {rand_int}\n\n"
+                f"Thank you for registering with Cinema E-Booking System!\n\n"
+                f"Please verify your account by entering the following code:\n"
+                f"{verification_code}\n\n"
+                f"Go to: {verification_link}\n\n"
+                f"This code will expire in 15 minutes.\n\n"
                 f"Thank you,\nCES Team"
             )
+
             #sending the mail
-            s.sendmail("cullenowens2005@gmail.com", user.email, message)
+            s.sendmail(gmail_email, user.email, message)
             s.quit()
+            print(f"Verification email sent to {user.email}")
 
         except Exception as e:
             print(f"Error sending email: {e}")
+            pass
 
 # --- Login ---
 class LoginView(APIView):
@@ -58,46 +92,124 @@ class LoginView(APIView):
         user = authenticate(username=s.validated_data["username"], password=s.validated_data["password"])
 
         if not user:
-            return Response({"error": "Invalid credentials"}, status=400)
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Check if user is active
-        profile = getattr(user, "profile", None)
-        if profile and profile.status != "Active":
-            return Response({"error": "Account not activated"}, status=403)
+        # Check if user is active (email verified)
+        if not user.is_active:
+            return Response({
+                "error": "Please verify your email before logging in",
+                "code": "EMAIL_NOT_VERIFIED"
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        tokens = RefreshToken.for_user(user)
+        refresh = RefreshToken.for_user(user)
         return Response({
-            "access": str(tokens.access_token),
-            "refresh": str(tokens),
-            "user": {"username": user.username, "email": user.email},
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email
+            }
         })
 
 # --- Logout ---
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
-        return Response({"message": "Logout successful"})
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
 
 # --- Profile ---
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        profile = request.user.profile
-        return Response(ProfileSerializer(profile).data)
+        try:
+            profile = Profile.objects.get(user=request.user)
+            serializer = ProfileSerializer(profile)
+            return Response(serializer.data)
+        except Profile.DoesNotExist:
+            return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request):
-        profile = request.user.profile
-        serializer = ProfileSerializer(profile, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        try:
+            profile = Profile.objects.get(user=request.user)
+            serializer = ProfileSerializer(profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Profile.DoesNotExist:
+            return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        
 
-        # Security: Email notification after profile change
-        send_mail(
-            "Profile updated",
-            "Your CES profile was updated.",
-            "no-reply@ces.com",
-            [request.user.email],
-            fail_silently=True,
-        )
-        return Response(serializer.data)
+@api_view(['POST'])
+def verify_email(request):
+    """Verify user email with verification code"""
+    try:
+        email = request.data.get('email')
+        verification_code = request.data.get('verification_code')
+        
+        if not email or not verification_code:
+            return Response({
+                'error': 'Email and verification code are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # find the most recent INACTIVE user with this email
+        user = User.objects.filter(
+            email=email, 
+            is_active=False
+        ).order_by('-date_joined').first()
+        
+        if not user:
+            # check if user already verified
+            active_user = User.objects.filter(email=email, is_active=True).first()
+            if active_user:
+                return Response({
+                    'message': 'Account already verified'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': 'No pending verification found for this email'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get user profile and check code
+        try:
+            profile = Profile.objects.get(user=user)
+        except Profile.DoesNotExist:
+            return Response({
+                'error': 'Profile not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Verify code matches
+        if profile.verification_code == verification_code:
+            # SUCCESS: Activate the user
+            user.is_active = True
+            user.save()
+            
+            # Update profile status and clear verification code
+            profile.status = "Active"
+            profile.verification_code = None
+            profile.save()
+            
+            print(f"User {user.username} verified successfully!")
+            
+            return Response({
+                'message': 'Email verified successfully! You can now login.',
+                'success': True
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'error': 'Invalid verification code'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        return Response({
+            'error': 'Verification failed',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
