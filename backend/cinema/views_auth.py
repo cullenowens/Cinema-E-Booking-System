@@ -213,3 +213,107 @@ def verify_email(request):
             'error': 'Verification failed',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+class ForgotPasswordView(APIView):
+    #when password reset is requested, send code to email
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            
+            if not email:
+                return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+            #finding user (has to be active)
+            user = User.objects.filter(email=email, is_active=True).first()
+            #case if user doesnt exist, won't show the email exists
+            if not user:
+                return Response({
+                    'message': 'If an account with that email exists, a reset code has been sent.'
+                }, status=status.HTTP_200_OK)
+            
+            reset_code = str(random.randint(100000, 999999))
+
+            try:
+                profile = Profile.objects.get(user=user)
+                #just reuses verification code field
+                profile.verification_code = reset_code
+                profile.save()
+                print(f"Password reset code saved to database: {reset_code}")
+            except Profile.DoesNotExist:
+                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            try:
+                s = smtplib.SMTP('smtp.gmail.com', 587)
+                s.starttls()
+                
+                gmail_email = os.getenv("GMAIL_EMAIL")
+                gmail_password = os.getenv("GMAIL_PASS")
+                
+                s.login(gmail_email, gmail_password)
+                
+                message = (
+                    f"Subject: CES Password Reset\n\n"
+                    f"Hello {user.username},\n\n"
+                    f"You requested to reset your password.\n\n"
+                    f"Your password reset code is:\n"
+                    f"{reset_code}\n\n"
+                    f"This code will expire in 15 minutes.\n\n"
+                    f"If you didn't request this, please ignore this email.\n\n"
+                    f"Thank you,\nCES Team"
+                )
+                
+                s.sendmail(gmail_email, user.email, message)
+                s.quit()
+                print(f"Reset email sent to {user.email}")
+                
+            except Exception as e:
+                print(f"Error sending reset email: {e}")
+            
+            return Response({
+                'message': 'If an account exists with this email, a reset code has been sent'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'error': 'Reset request failed',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class ResetPasswordView(APIView):
+    #using verif code, reset password
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            reset_code = request.data.get('reset_code')
+            new_password = request.data.get('new_password')
+
+            if not email or not reset_code or not new_password:
+                return Response({'error': 'Email, reset code, and new password are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            #find user (has to be active)
+            user = User.objects.filter(email=email, is_active=True).first()
+
+            if not user:
+                return Response({'error': 'Invalid email or reset code'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                profile = Profile.objects.get(user=user)
+            except Profile.DoesNotExist:
+                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            if profile.verification_code != reset_code:
+                return Response({'error': 'Invalid reset code'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user.set_password(new_password)
+            user.save()
+
+            #clear reset code
+            profile.verification_code = None
+            profile.save()
+
+            print(f"User {user.username} password reset successfully")
+            return Response({'message': 'Password reset successful', 'success': True}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'error': 'Password reset failed',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
