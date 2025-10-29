@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await axios.post(
         `${API_URL}/logout/`,
-        {},
+        { refresh: refreshToken },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
