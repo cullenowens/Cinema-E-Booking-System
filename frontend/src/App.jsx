@@ -7,6 +7,8 @@ import SignInPage from "./pages/SignInPage/SignInPage";
 import RegisterPage from "./pages/RegisterPage/RegisterPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import VerifyPage from "./pages/VerifyPage/VerifyPage";
+import ProfilePage from "./pages/ProfilePage/ProfilePage";
+import PaymentPage from "./pages/PaymentPage/PaymentPage";
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/booking/:id/:showtime" element={<BookingPage />} />
           <Route path="/verify" element={<VerifyPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/payment-methods" element={<PaymentPage />} />
         </Routes>
       </Router>
     </AuthProvider>
