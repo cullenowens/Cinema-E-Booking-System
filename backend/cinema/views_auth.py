@@ -9,6 +9,7 @@ from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from datetime import timedelta
+from django.utils import timezone
 from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
 from .models import Profile
@@ -36,6 +37,7 @@ class RegisterView(generics.CreateAPIView):
         try:
             profile, created = Profile.objects.get_or_create(user=user)
             profile.verification_code = verification_code
+            profile.verification_code_created_at = timezone.now()
             profile.status = "Inactive"  # status set to Inactive
             profile.save()
             print(f"Verification code saved to database: {verification_code}")
@@ -193,6 +195,14 @@ def verify_email(request):
                 'error': 'Profile not found'
             }, status=status.HTTP_404_NOT_FOUND)
         
+        #Check if code expired (5 minutes)
+        if profile.verification_code_created_at:
+            expiration_time = profile.verification_code_created_at + timedelta(minutes=5)
+            if timezone.now() > expiration_time:
+                return Response({
+                    'error': 'Verification code has expired'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Verify code matches
         if profile.verification_code == verification_code:
             # SUCCESS: Activate the user
@@ -202,6 +212,7 @@ def verify_email(request):
             # Update profile status and clear verification code
             profile.status = "Active"
             profile.verification_code = None
+            profile.verification_code_created_at = None
             profile.save()
             
             print(f"User {user.username} verified successfully!")
@@ -243,6 +254,7 @@ class ForgotPasswordView(APIView):
                 profile = Profile.objects.get(user=user)
                 #just reuses verification code field
                 profile.verification_code = reset_code
+                profile.verification_code_created_at = timezone.now()
                 profile.save()
                 print(f"Password reset code saved to database: {reset_code}")
             except Profile.DoesNotExist:
@@ -307,6 +319,13 @@ class ResetPasswordView(APIView):
             except Profile.DoesNotExist:
                 return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
             
+            if profile.verification_code_created_at:
+                expiration_time = profile.verification_code_created_at + timedelta(minutes=5)
+                if timezone.now() > expiration_time:
+                    return Response({
+                        'error': 'Verification code has expired'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
             if profile.verification_code != reset_code:
                 return Response({'error': 'Invalid reset code'}, status=status.HTTP_400_BAD_REQUEST)
             
