@@ -58,37 +58,14 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
     remember_me = serializers.BooleanField(required=False, default=False)
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ["username", "email", "first_name", "last_name"]
-        read_only_fields = ["username", "email"]
-
 class ProfileSerializer(serializers.ModelSerializer):
-    #username = serializers.CharField(source='user.username', read_only=True)
-    #email = serializers.EmailField(source='user.email', read_only=True)
-    #first_name = serializers.CharField(source='user.first_name', read_only=True)
-    #last_name = serializers.CharField(source='user.last_name', read_only=True)
-    user = UserSerializer()
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
     class Meta:
         model = Profile
-        fields = ["user", "phone", "subscribed", "status"]
-
-    def update(self, instance, validated_data):
-        # Handle nested user data
-        user_data = validated_data.pop('user', None)
-        if user_data:
-            user = instance.user
-            for attr, value in user_data.items():
-                setattr(user, attr, value)
-            user.save()
-        
-        # Update profile fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        
-        return instance
+        fields = ["username", "email", "first_name", "last_name" "phone", "subscribed", "status"]
 
 
 class AddressSerializer(serializers.ModelSerializer):
