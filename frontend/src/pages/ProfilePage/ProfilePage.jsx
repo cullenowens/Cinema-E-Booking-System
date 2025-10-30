@@ -70,7 +70,7 @@ const ProfilePage = () => {
       });
 
       const addressRes = await updateAddress({
-        street: formData.street,
+        street: formData.address,
         city: formData.city,
         state: formData.state,
         zip_code: formData.zipCode,
@@ -79,11 +79,22 @@ const ProfilePage = () => {
       alert("Profile updated");
     } catch (err) {
       if (err.response.status === 404) {
-        await axios.post(`${url}/auth/address/`, addressData, {
-          headers: { Authorization: `Bearer ${token}` },
+        
+        const { createAddress } = await import("../../api");
+        await createAddress({
+          street: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zipCode,
         });
+        alert("Profile and address created!");
+      } else {
+        console.error("Error updating profile:", err);
+        alert("Failed to update profile");
       }
-      console.error("Error updating profile:", error);
+        //await axios.post(`${url}/auth/address/`, addressData, {
+        //  headers: { Authorization: `Bearer ${token}` },
+        //});
     }
   };
 

@@ -86,10 +86,10 @@ class Promotion(models.Model):
 class Address(models.Model):
     # each user has only one address (well at least in this model)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    street = models.CharField(max_length=100)
-    city = models.CharField(max_length=50)
-    state = models.CharField(max_length=50)
-    zip_code = models.CharField(max_length=10)
+    street = models.CharField(max_length=100, blank=True, default="")
+    city = models.CharField(max_length=50, blank=True, default='')
+    state = models.CharField(max_length=50, blank=True, default='')
+    zip_code = models.CharField(max_length=10, blank=True, default='')
 
     class Meta:
         db_table = 'cinema_address'  # maps to the cinema_address table in the database
