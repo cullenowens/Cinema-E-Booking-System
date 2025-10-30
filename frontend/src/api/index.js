@@ -95,7 +95,7 @@ export const updateProfile = async (profileData) => {
 };
 
 export const forgotPassword = async (email) => {
-  const res = await axios.post(`${url}/auth/forgot-password/`, {
+  const res = await axios.post(`${url}/forgot-password/`, {
     email,
   });
   return res.data;
