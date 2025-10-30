@@ -30,6 +30,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         subscribed = validated_data.pop("subscribed", False)
         user = User.objects.create_user(**validated_data)
         Profile.objects.create(user=user, subscribed=subscribed, status="Inactive")
+        Address.objects.create(
+            user=user,
+            street="",
+            city="",
+            state="",
+            zip_code=""
+        )
         return user
     
 class AdminRegisterSerializer(serializers.ModelSerializer):
