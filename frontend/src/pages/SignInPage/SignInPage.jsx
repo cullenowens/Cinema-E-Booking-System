@@ -51,7 +51,7 @@ const SignInPage = () => {
     }
   };
 
-  const handleForgotPassword = (e) => {
+  const handleForgotPassword = async (e) => {
     e.preventDefault();
 
     if (!forgotEmail) {
@@ -70,7 +70,29 @@ const SignInPage = () => {
       text: "Password reset link has been sent to your email.",
     });
 
-    const res = forgotPassword(forgotEmail);
+    try {
+      const res = await forgotPassword(forgotEmail);  // Add await here
+      console.log("Password reset response:", res);
+      
+      setMessage({
+        type: "success",
+        text: "Password reset code has been sent to your email.",
+      });
+  
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setForgotEmail("");
+        setMessage({ type: "", text: "" });
+        navigate("/reset-password");  // Navigate to reset password page, not forgot-password
+      }, 3000);
+      
+    } catch (error) {
+      console.error("Password reset error:", error);
+      setMessage({
+        type: "error",
+        text: "Failed to send reset email. Please try again.",
+      });
+    }
 
     setTimeout(() => {
       setShowForgotPassword(false);
