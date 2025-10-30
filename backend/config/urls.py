@@ -22,5 +22,4 @@ urlpatterns = [
     path('admin/', admin.site.urls), #commenting out for now as we don't have admin setup
     #basic movie endpoints, no parameters necessary
     path('', include('cinema.urls')),
-    path('', include('cinema.urls_auth'))
 ]
