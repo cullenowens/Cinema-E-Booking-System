@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import Navbar from "../../components/Navbar/Navbar";
 import { useNavigate } from "react-router-dom";
+import { getAddress, updateAddress, updateProfile } from "../../api";
 
 const ProfilePage = () => {
   const { user, logout } = useAuth();
@@ -29,19 +30,27 @@ const ProfilePage = () => {
 
   // Populate form when user data becomes available
   useEffect(() => {
-    if (user) {
-      setFormData({
-        username: user.username || "",
-        firstName: user.first_name || "",
-        lastName: user.last_name || "",
-        phone: user.phone || "",
-        address: user.address || "",
-        city: user.city || "",
-        state: user.state || "",
-        zipCode: user.zip_code || "",
-        promotions: user.promotions || false,
-      });
-    }
+    const fetchData = async () => {
+      if (user) {
+        try {
+          const addressData = await getAddress();
+          setFormData({
+            username: user.username || "",
+            firstName: user.first_name || "",
+            lastName: user.last_name || "",
+            phone: user.phone || "",
+            address: addressData.street || "",
+            city: addressData.city || "",
+            state: addressData.state || "",
+            zipCode: addressData.zip_code || "",
+            promotions: user.subscribed || false,
+          });
+        } catch (error) {
+          console.log(error.response?.data);
+        }
+      }
+    };
+    fetchData();
   }, [user]);
 
   const handleChange = (e) => {
@@ -52,10 +61,30 @@ const ProfilePage = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Updated profile data:", formData);
-    // TODO: send PUT request to backend
+    try {
+      const result = await updateProfile({
+        phone: formData.phone,
+        subscribed: formData.promotions,
+      });
+
+      const addressRes = await updateAddress({
+        street: formData.street,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zipCode,
+      });
+
+      alert("Profile updated");
+    } catch (err) {
+      if (err.response.status === 404) {
+        await axios.post(`${url}/auth/address/`, addressData, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      console.error("Error updating profile:", error);
+    }
   };
 
   const handleLogout = () => {

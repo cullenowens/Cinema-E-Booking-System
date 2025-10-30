@@ -1,28 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar/Navbar";
 import { useAuth } from "../../contexts/AuthContext";
+import { getPaymentCards, addPaymentCard, deletePaymentCard } from "../../api";
 
 const PaymentPage = () => {
   const navigate = useNavigate();
-  const [view, setView] = useState("list"); // 'list' or 'add'
-
   const { user } = useAuth();
 
-  // Replace with actual API call to fetch user's cards
+  const [view, setView] = useState("list"); // 'list' or 'add'
   const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
+    brand: "",
     cardNumber: "",
-    expiryMonth: "",
-    expiryYear: "",
+    expiration: "",
     cvv: "",
     billingZip: "",
   });
 
   const MAX_CARDS = 4;
 
-  const handleAddCard = (e) => {
+  // Load cards from backend
+  useEffect(() => {
+    const fetchCards = async () => {
+      try {
+        const data = await getPaymentCards();
+        setCards(data);
+      } catch (err) {
+        console.error("Error fetching cards:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCards();
+  }, [user]);
+
+  const handleAddCard = async (e) => {
     e.preventDefault();
 
     if (formData.cardNumber.length < 13) {
@@ -30,27 +45,50 @@ const PaymentPage = () => {
       return;
     }
 
-    const newCard = {
-      id: Date.now(),
-      lastFour: formData.cardNumber.slice(-4),
-      expiry: `${formData.expiryMonth}/${formData.expiryYear}`,
-    };
-    // TODO: Replace with API call to add card to backend
-    setCards([...cards, newCard]);
-    setFormData({
-      cardNumber: "",
-      expiryMonth: "",
-      expiryYear: "",
-      cvv: "",
-      billingZip: "",
-    });
-    setView("list");
+    try {
+      const payload = {
+        brand: formData.brand,
+        card_number: formData.cardNumber,
+        expiration: formData.expiration,
+        cvv: formData.cvv,
+        billing_zip: formData.billingZip,
+      };
+
+      const newCard = await addPaymentCard(payload);
+      setCards([...cards, newCard]);
+
+      setFormData({
+        brand: "",
+        cardNumber: "",
+        expiration: "",
+        cvv: "",
+        billingZip: "",
+      });
+
+      setView("list");
+    } catch (err) {
+      console.log(err.response?.data);
+    }
   };
 
-  const handleRemoveCard = (id) => {
-    // TODO: Replace with API call to remove card from backend
-    setCards(cards.filter((card) => card.id !== id));
+  const handleRemoveCard = async (id) => {
+    try {
+      await deletePaymentCard(id);
+      setCards(cards.filter((card) => card.id !== id));
+    } catch (err) {
+      console.error("Error deleting card:", err);
+      alert("Failed to remove card. Please try again.");
+    }
   };
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"></div>
+      </>
+    );
+  }
 
   if (view === "add") {
     return (
@@ -74,6 +112,22 @@ const PaymentPage = () => {
               <form onSubmit={handleAddCard} className="space-y-5">
                 <div>
                   <label className="block text-gray-300 mb-2 font-medium">
+                    Card Brand
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.brand}
+                    onChange={(e) =>
+                      setFormData({ ...formData, brand: e.target.value })
+                    }
+                    placeholder="Visa, Mastercard, AMEX, etc."
+                    required
+                    className="w-full p-4 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2 font-medium">
                     Card Number
                   </label>
                   <input
@@ -92,58 +146,24 @@ const PaymentPage = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-300 mb-2 font-medium text-sm">
-                      Month
+                      Expiration (MM/YY)
                     </label>
-                    <select
-                      value={formData.expiryMonth}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          expiryMonth: e.target.value,
-                        })
-                      }
+                    <input
+                      type="text"
+                      value={formData.expiration}
+                      onChange={(e) => {
+                        const value = e.target.value
+                          .replace(/[^\d/]/g, "")
+                          .substring(0, 7);
+                        setFormData({ ...formData, expiration: value });
+                      }}
+                      placeholder="03/2026"
                       required
                       className="w-full p-4 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">MM</option>
-                      {Array.from({ length: 12 }, (_, i) => {
-                        const month = String(i + 1).padStart(2, "0");
-                        return (
-                          <option key={month} value={month}>
-                            {month}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 mb-2 font-medium text-sm">
-                      Year
-                    </label>
-                    <select
-                      value={formData.expiryYear}
-                      onChange={(e) =>
-                        setFormData({ ...formData, expiryYear: e.target.value })
-                      }
-                      required
-                      className="w-full p-4 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">YY</option>
-                      {Array.from({ length: 10 }, (_, i) => {
-                        const year = String(new Date().getFullYear() + i).slice(
-                          -2
-                        );
-                        return (
-                          <option key={year} value={year}>
-                            {year}
-                          </option>
-                        );
-                      })}
-                    </select>
+                    />
                   </div>
 
                   <div>
@@ -272,10 +292,7 @@ const PaymentPage = () => {
                     </div>
                     <div>
                       <p className="text-white font-semibold text-lg">
-                        •••• {card.lastFour}
-                      </p>
-                      <p className="text-gray-400 text-sm mt-1">
-                        Expires {card.expiry}
+                        {card.brand} •••• {card.lastFour}
                       </p>
                     </div>
                   </div>

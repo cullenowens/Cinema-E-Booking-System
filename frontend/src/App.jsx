@@ -9,6 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import VerifyPage from "./pages/VerifyPage/VerifyPage";
 import ProfilePage from "./pages/ProfilePage/ProfilePage";
 import PaymentPage from "./pages/PaymentPage/PaymentPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage/ForgotPasswordPage";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/verify" element={<VerifyPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/payment-methods" element={<PaymentPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Routes>
       </Router>
     </AuthProvider>
