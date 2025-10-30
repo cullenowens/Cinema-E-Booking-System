@@ -69,6 +69,8 @@ const SignInPage = () => {
       text: "Password reset link has been sent to your email.",
     });
 
+    // send forgot email here
+
     setTimeout(() => {
       setShowForgotPassword(false);
       setForgotEmail("");
@@ -76,7 +78,6 @@ const SignInPage = () => {
     }, 4000);
   };
 
-  // --- Forgot Password View ---
   if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
