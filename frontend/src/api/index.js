@@ -95,14 +95,14 @@ export const updateProfile = async (profileData) => {
 };
 
 export const forgotPassword = async (email) => {
-  const res = await axios.post(`${url}/api/auth/forgot-password/`, {
+  const res = await axios.post(`${url}/auth/forgot-password/`, {
     email,
   });
   return res.data;
 };
 
 export const resetPassword = async (token, newPassword, email) => {
-  const res = await axios.post(`${url}/api/auth/reset-password/`, {
+  const res = await axios.post(`${url}/auth/reset-password/`, {
     reset_code: token,
     new_password: newPassword,
     email: email,
