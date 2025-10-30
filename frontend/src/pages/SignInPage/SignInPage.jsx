@@ -4,6 +4,7 @@ import LockIcon from "@mui/icons-material/Lock";
 import EmailIcon from "@mui/icons-material/Email";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { forgotPassword } from "../../api";
 
 const SignInPage = () => {
   const { login } = useAuth();
@@ -69,12 +70,13 @@ const SignInPage = () => {
       text: "Password reset link has been sent to your email.",
     });
 
-    // send forgot email here
+    const res = forgotPassword(forgotEmail);
 
     setTimeout(() => {
       setShowForgotPassword(false);
       setForgotEmail("");
       setMessage({ type: "", text: "" });
+      navigate("/forgot-password");
     }, 4000);
   };
 
