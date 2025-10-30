@@ -35,7 +35,7 @@ urlpatterns += [
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
     path("api/auth/profile/", ProfileView.as_view(), name="profile"),
     path('api/auth/verify/', verify_email, name='verify_email'),
-    path('api/auth/forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
+    path('forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
     path('api/auth/reset-password/', ResetPasswordView().as_view(), name='reset_password'),
 
     # address endpoint for user address management
