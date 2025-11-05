@@ -1,3 +1,14 @@
+'''
+The Purpose of this file is to define URL patterns for the Cinema E-Booking System backend.
+The file maps URL patterns to view functions/classes.
+
+URL Structure:
+- /admin/*  -> Admin-specific endpoints for managing movies and promotions.
+- /api/movies/*  -> Public API endpoints for retrieving movie information.
+- /api/auth/*  -> Authentication and user profile management endpoints.
+'''
+
+
 # cinema/urls.py
 from django.urls import path
 from . import views, admin_views, views_auth
@@ -30,19 +41,44 @@ urlpatterns = [
 from .views_auth import RegisterView, LoginView, LogoutView, ProfileView, verify_email, ForgotPasswordView, ResetPasswordView
 
 urlpatterns += [
+    # User Registration - POST /api/auth/register/
+    # Creates new user account and sends verification email
     path("api/auth/register/", RegisterView.as_view(), name="register"),
+
+    # User Login - POST /api/auth/login/
+    # Authenticates user and returns JWT tokens
     path("api/auth/login/", LoginView.as_view(), name="login"),
+
+    # User Logout - POST /api/auth/logout/
+    # Blacklists refresh token to invalidate session
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
+
+     # User Profile - GET/PUT /api/auth/profile/
+    # GET: Retrieve user profile info | PUT: Update profile info
     path("api/auth/profile/", ProfileView.as_view(), name="profile"),
+
+    # Email Verification - POST /api/auth/verify/
+    # Verifies user email with 6-digit code (expires in 5 minutes)
     path('api/auth/verify/', verify_email, name='verify_email'),
+
+    # Forgot Password - POST /api/auth/forgot-password/
+    # Sends password reset code to user's email
     path('api/auth/forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
+
+    # Reset Password - POST /api/auth/reset-password/
+    # Resets password using code from forgot-password email
     path('api/auth/reset-password/', ResetPasswordView.as_view(), name='reset_password'),
 
-    # address endpoint for user address management
+     # User Address - GET/POST/PUT /api/auth/address/
+    # Manage user's billing address (one per user)
     path('api/auth/address/', views_auth.AddressView.as_view(), name='address'),
     
-    # payment card endpoints for user payment methods
+    # Payment Cards - GET/POST /api/auth/payment-cards/
+    # List all cards or add new payment card (max 4 per user, encrypted storage)
     path('api/auth/payment-cards/', views_auth.PaymentCardView.as_view(), name='payment_cards'),
+
+    # Payment Card Detail - GET/PUT/DELETE /api/auth/payment-cards/<id>/
+    # Retrieve, update, or delete specific payment card
     path('api/auth/payment-cards/<int:pk>/', views_auth.PaymentCardDetailView.as_view(), name='payment_card_detail'),
 ]
 

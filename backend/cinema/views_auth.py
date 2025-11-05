@@ -1,3 +1,14 @@
+'''
+The purpose of this file is to handle all user authentication and profile management functionality.
+
+Includes:
+- User registration with email verification
+- Login/logout with JWT tokens
+- Password reset (forgot password)
+- User profile management (view/edit)
+- Billing address management
+- Payment card management (encrypted storage)
+'''
 import os
 import smtplib
 import random
@@ -17,6 +28,7 @@ from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer,
 
 # --- Registration ---
 class RegisterView(generics.CreateAPIView):
+   
     serializer_class = RegisterSerializer
 
     def perform_create(self, serializer):
@@ -159,7 +171,54 @@ class ProfileView(APIView):
 
 @api_view(['POST'])
 def verify_email(request):
-    """Verify user email with verification code"""
+    """
+    Verify user email address using a 6-digit code sent via email during registration.
+
+    **Endpoint:** POST /api/auth/verify/
+    
+    **Authentication:** Not required
+    
+    **Input (JSON):**
+        {
+            "email": "john@example.com",      // Required, registered email
+            "verification_code": "123456"     // Required, 6-digit code from email
+        }
+
+    **Output (Success - 200 OK):**
+        {
+            "message": "Email verified successfully! You can now login.",
+            "success": true
+        }
+
+    **Output (Error - 400 Bad Request):**
+        {
+            "error": "Email and verification code are required"
+        }
+        // OR
+        {
+            "error": "Invalid or expired verification code"
+        }
+        // OR
+        {
+            "error": "User not found"
+        }
+    
+    **Behavior:**
+        1. Looks up user by email
+        2. Validates verification code
+        3. Checks if code expired (5-minute expiration)
+        4. Activates user account (sets is_active=True)
+        5. Deletes verification token
+    
+    **Code Expiration:**
+        - Codes expire 5 minutes after creation
+        - Expired codes return error
+        - User must request new code via registration or forgot password
+    
+    **After Verification:**
+        - User account becomes active
+        - User can now login with POST /api/auth/login/
+    """
     try:
         email = request.data.get('email')
         verification_code = request.data.get('verification_code')
@@ -347,7 +406,109 @@ class ResetPasswordView(APIView):
 
 # --- Address ---
 class AddressView(APIView):
-    """handle user address operations (GET, POST, PUT)"""
+    """
+    Manage user's billing address (one address per user).
+    
+    **Endpoint:** GET/POST/PUT /api/auth/address/
+    
+    **Authentication:** Required (IsAuthenticated)
+    
+    **Headers:**
+        Authorization: Bearer <access_token>
+
+        
+    **GET REQUEST**
+    -----------
+    Retrieve user's billing address.
+    
+    **Input:** None (user from JWT token)
+    
+    **Output (Success - 200 OK):**
+        {
+            "id": 1,
+            "street": "123 Main St",
+            "city": "Atlanta",
+            "state": "GA",
+            "zip_code": "30309"
+        }
+    
+    **Output (No Address - 404 Not Found):**
+        {
+            "error": "Address not found"
+        }
+
+        
+    **POST REQUEST**
+    -----------
+    Create new billing address (only if user has none).
+    
+    **Input (JSON):**
+        {
+            "street": "123 Main St",          // Required, max 255 chars
+            "city": "Atlanta",                // Required, max 100 chars
+            "state": "GA",                    // Required, 2-char state code
+            "zip_code": "30309"               // Required, 5 or 9 digits
+        }
+    
+    **Output (Success - 201 Created):**
+        {
+            "id": 1,
+            "street": "123 Main St",
+            "city": "Atlanta",
+            "state": "GA",
+            "zip_code": "30309"
+        }
+
+    **Output (Error - 400 Bad Request):**
+        {
+            "error": "User already has an address. Use PUT to update."
+        }
+        // OR
+        {
+            "street": ["This field is required"],
+            "zip_code": ["Enter a valid zip code"]
+        } 
+
+        
+     **PUT REQUEST**
+    -----------
+    Update existing billing address.
+    
+    **Input (JSON):**
+        {
+            "street": "456 New St",           // Optional
+            "city": "Atlanta",                // Optional
+            "state": "GA",                    // Optional
+            "zip_code": "30310"               // Optional
+        }
+        // Send only fields to update
+    
+    **Output (Success - 200 OK):**
+        {
+            "id": 1,
+            "street": "456 New St",
+            "city": "Atlanta",
+            "state": "GA",
+            "zip_code": "30310"
+        } 
+
+    **Output (Error - 404 Not Found):**
+        {
+            "error": "Address not found. Use POST to create."
+        }
+    
+    **Validation:**
+        - Street: Required, max 255 characters
+        - City: Required, max 100 characters
+        - State: Required, 2 uppercase letters (e.g., GA, CA, NY)
+        - Zip Code: Required, format: 12345 or 12345-6789
+    
+    **Limitations:**
+        - One address per user (for billing)
+        - Cannot delete address (use PUT to update)
+        - Address is used for payment processing
+
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -390,7 +551,96 @@ class AddressView(APIView):
     
 # --- Payment Cards (creation view) ---
 class PaymentCardView(APIView):
-    """handle payment card list operations (GET all cards, POST new card)"""
+    """
+    Manage user's payment cards (max 4 cards per user, encrypted storage).
+
+    **Endpoint:** GET/POST /api/auth/payment-cards/
+    
+    **Authentication:** Required (IsAuthenticated)
+    
+    **Headers:**
+        Authorization: Bearer <access_token>
+
+        
+    **GET REQUEST**
+    -----------
+    List all saved payment cards for user.
+    
+    **Input:** None (user from JWT token)
+    
+    **Output (Success - 200 OK):**
+        [
+            {
+                "id": 1,
+                "brand": "Visa",
+                "card_number_enc": "****1234",    // Last 4 digits only
+                "expiration": "12/2025"
+            },
+            {
+                "id": 2,
+                "brand": "Mastercard",
+                "card_number_enc": "****5678",
+                "expiration": "06/2026"
+            }
+        ]
+
+    **Output (No Cards - 200 OK):**
+        []
+
+    
+     **POST REQUEST**
+    -----------
+    Add new payment card (encrypted, sends email notification).
+    
+    **Input (JSON):**
+        {
+            "card_number": "4111111111111111", // Required, 13-19 digits
+            "brand": "Visa",                   // Required (Visa, Mastercard, Amex, Discover)
+            "expiration": "12/2025"            // Required, format: MM/YYYY
+        }
+    
+    **Output (Success - 201 Created):**
+        {
+            "id": 3,
+            "brand": "Visa",
+            "card_number_enc": "****1111",
+            "expiration": "12/2025"
+        }
+
+    **Output (Error - 400 Bad Request):**
+        {
+            "error": "You can only store up to 4 payment cards"
+        }
+        // OR
+        {
+            "card_number": ["Enter a valid card number"],
+            "expiration": ["Invalid expiration date"]
+        }
+
+    **Card Number Encryption:**
+        - Full card number encrypted with Fernet symmetric encryption
+        - Only last 4 digits stored in plaintext for display
+        - Encryption key stored in environment variable
+        - Card numbers never returned in API responses (security)
+    
+    **Email Notification:**
+        When card is added, user receives email:
+        Subject: "New Payment Card Added"
+        Body: "A new Visa ending in 1234 was added to your account."
+    
+    **Validation:**
+        - Card Number: Must be valid format (Luhn algorithm)
+        - Brand: Must be Visa, Mastercard, American Express, or Discover
+        - Expiration: Format MM/YYYY, must be future date
+        - Max Cards: 4 cards per user
+    
+    **Security:**
+        - Card numbers encrypted at rest
+        - SSL/TLS encryption in transit
+        - PCI compliance considerations
+        - User notification on card changes
+
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -429,7 +679,100 @@ class PaymentCardView(APIView):
     
 # --- Payment Card Detail (individual card view) ---
 class PaymentCardDetailView(APIView):
-    """handle individual payment card operations (GET one, PUT update, DELETE)"""
+    """
+    Handles individual payment card operations by ID for the authenticated user.
+
+    **Endpoint:** GET/PUT/DELETE /api/auth/payment-cards/<id>/
+    
+    **Authentication:** Required (IsAuthenticated)
+    
+    **Headers:**
+        Authorization: Bearer <access_token>
+
+    **GET REQUEST**
+    -----------
+    Retrieve specific payment card details.
+    
+    **URL:** GET /api/auth/payment-cards/3/
+    
+    **Input:** Card ID in URL
+    
+    **Output (Success - 200 OK):**
+        {
+            "id": 3,
+            "brand": "Visa",
+            "card_number_enc": "****1234",
+            "expiration": "12/2025"
+        }
+    
+    **Output (Error - 404 Not Found):**
+        {
+            "error": "Payment card not found"
+        }
+
+    
+    **PUT REQUEST**
+    ---
+    Update payment card (brand and expiration only, NOT card number).
+    
+    **URL:** PUT /api/auth/payment-cards/3/
+    
+    **Input (JSON):**
+        {
+            "brand": "Mastercard",            // Optional
+            "expiration": "06/2026"           // Optional
+        }
+        // Note: Cannot update card_number for security
+    
+    **Output (Success - 200 OK):**
+        {
+            "id": 3,
+            "brand": "Mastercard",
+            "card_number_enc": "****1234",
+            "expiration": "06/2026"
+        }
+    
+    **Output (Error - 400 Bad Request):**
+        {
+            "expiration": ["Invalid expiration date"]
+        }
+
+    
+    **DELETE REQUEST**
+    ---
+    Permanently delete payment card (sends email notification).
+    
+    **URL:** DELETE /api/auth/payment-cards/3/
+    
+    **Input:** Card ID in URL
+    
+    **Output (Success - 200 OK):**
+        {
+            "message": "Payment card deleted successfully"
+        }
+    
+    **Output (Error - 404 Not Found):**
+        {
+            "error": "Payment card not found"
+        }
+
+
+    **Email Notification (on delete):**
+        Subject: "Payment Card Removed"
+        Body: "Your Visa card ending in 1234 was removed from your account."
+    
+    **Security:**
+        - Users can only access their own cards
+        - Card number cannot be updated (must delete and re-add)
+        - Email notifications for all card changes
+        - Deletion is permanent (cannot be undone)
+    
+    **Why Card Number Cannot Be Updated:**
+        - Security best practice
+        - Prevents card number changes without full validation
+        - Forces user to re-enter full card number
+        - Maintains audit trail 
+    """
     permission_classes = [IsAuthenticated]
 
     def get_object(self, pk):
