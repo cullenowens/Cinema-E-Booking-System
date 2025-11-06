@@ -1,4 +1,6 @@
 # cinema/urls.py
+#this defines the specific routes for the cinema app and actual endpoints to logic
+#will only handle urls that config/urls.py sends to it
 from django.urls import path
 from . import views, admin_views, views_auth
 
