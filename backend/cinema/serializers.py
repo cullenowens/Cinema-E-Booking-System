@@ -2,6 +2,9 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Profile, Movie, Promotion, PaymentCard, Address
 
+# --- Movie Serializer ---
+# Handles Movie model serialization (for display or creation)
+
 class MovieSerializer(serializers.ModelSerializer):
     #genres = GenreSerializer(many=True, source='moviegenre_set', read_only=True)
     #showtimes = MovieShowtimeSerializer(many=True, read_only=True)
@@ -10,10 +13,16 @@ class MovieSerializer(serializers.ModelSerializer):
         model = Movie
         fields = ['movie_id', 'movie_title', 'movie_description', 'age_rating', 'poster_url', 'trailer_url', 'movie_status', 'genres', 'showtimes']
 
+# --- Promotion Serializer ---
+# Serializes promotions and their discount details
+
 class PromotionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promotion
         fields = ['id', 'title', 'description', 'discount_percentage']
+
+# --- User Registration Serializer ---
+# Creates new users and associated profiles
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -26,6 +35,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ["username", "email", "password", "first_name", "last_name", "subscribed"]
 
+# Creates user and inactive profile (activated later)
     def create(self, validated_data):
         subscribed = validated_data.pop("subscribed", False)
         user = User.objects.create_user(**validated_data)
@@ -39,6 +49,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
     
+# --- Admin Registration Serializer ---
+# Creates staff (admin) users with active profiles
+
 class AdminRegisterSerializer(serializers.ModelSerializer):
     #for crearting admin users
     #could look into hardcoding admin users
@@ -46,6 +59,8 @@ class AdminRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["username", "email", "password", "first_name", "last_name"]
+
+# Creates admin user and marks them active
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
         user.is_staff = True
@@ -53,10 +68,16 @@ class AdminRegisterSerializer(serializers.ModelSerializer):
         Profile.objects.create(user=user, status="Active", subscribed=True)
         return user
 
+# --- Login Serializer ---
+# Handles login credentials and optional remember-me flag
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
     remember_me = serializers.BooleanField(required=False, default=False)
+
+# --- Profile Serializer ---
+# Serializes user profile details
 
 class ProfileSerializer(serializers.ModelSerializer):
     #username = serializers.CharField(source='user.username', read_only=True)
@@ -68,6 +89,9 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ["username", "email", "first_name", "last_name" "phone", "subscribed", "status"]
 
 
+# --- Address Serializer ---
+# Serializes user addresses and auto-links them to the current user
+
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
@@ -77,7 +101,10 @@ class AddressSerializer(serializers.ModelSerializer):
         # automatically assign current user to the address
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
-    
+
+# --- Payment Card Serializer ---
+# Serializes payment card data securely (encrypts number)
+
 class PaymentCardSerializer(serializers.ModelSerializer):
     # stores the encrypted card number
     masked_card_number = serializers.SerializerMethodField(read_only=True)
