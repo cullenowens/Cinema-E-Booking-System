@@ -2,15 +2,15 @@
 #this defines the specific routes for the cinema app and actual endpoints to logic
 #will only handle urls that config/urls.py sends to it
 from django.urls import path
-from . import views, admin_views, views_auth
+from . import views, views_admin, views_auth
 
 urlpatterns = [
     #Admin Movies
-    path('admin/movies/', admin_views.AdminMovieView.as_view(), name='admin-add-movie'),        # POST to add
-    path('admin/movies/<int:pk>/', admin_views.AdminMovieView.as_view(), name='admin-remove-movie'),  # DELETE to remove
+    path('admin/movies/', views_admin.AdminMovieView.as_view(), name='admin-add-movie'),        # POST to add
+    path('admin/movies/<int:pk>/', views_admin.AdminMovieView.as_view(), name='admin-remove-movie'),  # DELETE to remove
     #Admin Promotions
-    path('admin/promotions/', admin_views.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
-    path('admin/promotions/<int:pk>/', admin_views.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
+    path('admin/promotions/', views_admin.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
+    path('admin/promotions/<int:pk>/', views_admin.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
     #basic movie endpoints, no parameters necessary
     #GET /api/movies/ - get all movies with details
     path('api/movies/', views.get_all_movies, name='get_all_movies'),
@@ -32,18 +32,28 @@ urlpatterns = [
 from .views_auth import RegisterView, LoginView, LogoutView, ProfileView, verify_email, ForgotPasswordView, ResetPasswordView
 
 urlpatterns += [
+    #POST path to register + first name, last name, password, subscribed
     path("api/auth/register/", RegisterView.as_view(), name="register"),
+    #POST + username, password, *remember me*?
     path("api/auth/login/", LoginView.as_view(), name="login"),
+    #POST path
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
+    #GET + auth token path to get user profile info
     path("api/auth/profile/", ProfileView.as_view(), name="profile"),
+    #We need an update profile path too
+    #PUT + auth token path to update user profile info
+    #GET then check token "?token=..."
     path('api/auth/verify/', verify_email, name='verify_email'),
+    #POST then use the email the user inputs
     path('api/auth/forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
+    #POST then use the token and new password the user inputs
     path('api/auth/reset-password/', ResetPasswordView.as_view(), name='reset_password'),
 
-    # address endpoint for user address management
+    #multiple potential endpoints for user address management
+    #GET (get current address), POST(create new), PUT(update), DELETE for user address
     path('api/auth/address/', views_auth.AddressView.as_view(), name='address'),
     
-    # payment card endpoints for user payment methods
+    #GET or POST + brand, expiration, card no.
     path('api/auth/payment-cards/', views_auth.PaymentCardView.as_view(), name='payment_cards'),
     path('api/auth/payment-cards/<int:pk>/', views_auth.PaymentCardDetailView.as_view(), name='payment_card_detail'),
 ]
