@@ -381,21 +381,12 @@ class ResetPasswordView(APIView):
             except Profile.DoesNotExist:
                 return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
             
-            if profile.verification_code_created_at:
-                expiration_time = profile.verification_code_created_at + timedelta(minutes=5)
-                if timezone.now() > expiration_time:
-                    return Response({
-                        'error': 'Verification code has expired'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-
-            if profile.verification_code != reset_code:
-                return Response({'error': 'Invalid reset code'}, status=status.HTTP_400_BAD_REQUEST)
-            
+            if len(new_password) < 8:
+                return Response({'error': 'Password must be at least 8 characters long'}, status=status.HTTP_400_BAD_REQUEST)
             user.set_password(new_password)
             user.save()
 
             #clear reset code
-            profile.verification_code = None
             profile.save()
 
             print(f"User {user.username} password reset successfully")
