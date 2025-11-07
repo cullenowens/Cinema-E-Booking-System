@@ -154,20 +154,40 @@ class ProfileView(APIView):
 
     def get(self, request):
         try:
-            profile = Profile.objects.get(user=request.user)
-            serializer = ProfileSerializer(profile)
-            return Response(serializer.data)
+            #profile = Profile.objects.get(user=request.user)
+            #serializer = ProfileSerializer(profile)
+            user = request.user
+            return Response({
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "phone": user.profile.phone,
+                "subscribed": user.profile.subscribed,
+                "status": user.profile.status
+            })
         except Profile.DoesNotExist:
             return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request):
         try:
-            profile = Profile.objects.get(user=request.user)
-            serializer = ProfileSerializer(profile, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            user = request.user
+            profile = user.profile
+            
+            # Update User fields
+            user.first_name = request.data.get('first_name', user.first_name)
+            user.last_name = request.data.get('last_name', user.last_name)
+            user.email = request.data.get('email', user.email)
+            user.save()
+            
+            # Update Profile fields
+            profile.phone = request.data.get('phone', profile.phone)
+            profile.subscribed = request.data.get('subscribed', profile.subscribed)
+            profile.save()
+            
+            return Response({'message': 'Profile updated successfully'})
+    
         except Profile.DoesNotExist:
             return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
         
