@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#this file will run the django server
 """Django's command-line utility for administrative tasks."""
 import os
 import sys

@@ -14,12 +14,13 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+#main entrypoint for all URLs in the project
 from django.contrib import admin
 from django.urls import path, include
 #from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls), #commenting out for now as we don't have admin setup
-    #basic movie endpoints, no parameters necessary
+    #this takes the incoming request and sends it to cinema/urls.py for further processing
     path('', include('cinema.urls')),
 ]

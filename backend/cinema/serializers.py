@@ -1,3 +1,5 @@
+#takes an object from the database (eg Movie) and converts it to JSON for API responses
+#or, takes info from frontend (password= serializers...), validates fields, then creates/updates database objects
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Profile, Movie, Promotion, PaymentCard, Address
@@ -10,7 +12,9 @@ class MovieSerializer(serializers.ModelSerializer):
     #showtimes = MovieShowtimeSerializer(many=True, read_only=True)
 
     class Meta:
+        #takes a movie object from database
         model = Movie
+        #conversion for frontend
         fields = ['movie_id', 'movie_title', 'movie_description', 'age_rating', 'poster_url', 'trailer_url', 'movie_status', 'genres', 'showtimes']
 
 # --- Promotion Serializer ---
@@ -25,6 +29,7 @@ class PromotionSerializer(serializers.ModelSerializer):
 # Creates new users and associated profiles
 
 class RegisterSerializer(serializers.ModelSerializer):
+    #receives data from frontend for registration and validates it
     password = serializers.CharField(write_only=True)
     subscribed = serializers.BooleanField(write_only=True, required=False, default=False)
     first_name = serializers.CharField(required=False, allow_blank=True)
@@ -39,7 +44,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         subscribed = validated_data.pop("subscribed", False)
         user = User.objects.create_user(**validated_data)
+        #create associated profile
         Profile.objects.create(user=user, subscribed=subscribed, status="Inactive")
+        #creates empty address for the user
         Address.objects.create(
             user=user,
             street="",
@@ -86,7 +93,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     #last_name = serializers.CharField(source='user.last_name', read_only=True)
     class Meta:
         model = Profile
-        fields = ["username", "email", "first_name", "last_name" "phone", "subscribed", "status"]
+        fields = ["username", "email", "first_name", "last_name", "phone", "subscribed", "status"]
 
 
 # --- Address Serializer ---

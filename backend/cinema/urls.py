@@ -10,16 +10,18 @@ URL Structure:
 
 
 # cinema/urls.py
+#this defines the specific routes for the cinema app and actual endpoints to logic
+#will only handle urls that config/urls.py sends to it
 from django.urls import path
-from . import views, admin_views, views_auth
+from . import views, views_admin, views_auth
 
 urlpatterns = [
     #Admin Movies
-    path('admin/movies/', admin_views.AdminMovieView.as_view(), name='admin-add-movie'),        # POST to add
-    path('admin/movies/<int:pk>/', admin_views.AdminMovieView.as_view(), name='admin-remove-movie'),  # DELETE to remove
+    path('admin/movies/', views_admin.AdminMovieView.as_view(), name='admin-add-movie'),        # POST to add
+    path('admin/movies/<int:pk>/', views_admin.AdminMovieView.as_view(), name='admin-remove-movie'),  # DELETE to remove
     #Admin Promotions
-    path('admin/promotions/', admin_views.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
-    path('admin/promotions/<int:pk>/', admin_views.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
+    path('admin/promotions/', views_admin.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
+    path('admin/promotions/<int:pk>/', views_admin.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
     #basic movie endpoints, no parameters necessary
     #GET /api/movies/ - get all movies with details
     path('api/movies/', views.get_all_movies, name='get_all_movies'),
@@ -41,29 +43,38 @@ urlpatterns = [
 from .views_auth import RegisterView, LoginView, LogoutView, ProfileView, verify_email, ForgotPasswordView, ResetPasswordView
 
 urlpatterns += [
+    #POST path to register + first name, last name, password, subscribed
     # User Registration - POST /api/auth/register/
     # Creates new user account and sends verification email
     path("api/auth/register/", RegisterView.as_view(), name="register"),
+    #POST + username, password, *remember me*?
 
     # User Login - POST /api/auth/login/
     # Authenticates user and returns JWT tokens
     path("api/auth/login/", LoginView.as_view(), name="login"),
+    #POST path
 
     # User Logout - POST /api/auth/logout/
     # Blacklists refresh token to invalidate session
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
+    #GET + auth token path to get user profile info
 
      # User Profile - GET/PUT /api/auth/profile/
     # GET: Retrieve user profile info | PUT: Update profile info
     path("api/auth/profile/", ProfileView.as_view(), name="profile"),
+    #We need an update profile path too
+    #PUT + auth token path to update user profile info
+    #GET then check token "?token=..."
 
     # Email Verification - POST /api/auth/verify/
     # Verifies user email with 6-digit code (expires in 5 minutes)
     path('api/auth/verify/', verify_email, name='verify_email'),
+    #POST then use the email the user inputs
 
     # Forgot Password - POST /api/auth/forgot-password/
     # Sends password reset code to user's email
     path('api/auth/forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
+    #POST then use the token and new password the user inputs
 
     # Reset Password - POST /api/auth/reset-password/
     # Resets password using code from forgot-password email

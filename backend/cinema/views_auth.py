@@ -1,3 +1,6 @@
+#creates function for the route from urls.oy
+#creates the logic responsible for processing a request, in this case,
+#user registration, login, logout, profile management, payment cards, address management
 '''
 The purpose of this file is to handle all user authentication and profile management functionality.
 
