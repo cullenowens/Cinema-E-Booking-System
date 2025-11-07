@@ -1,3 +1,5 @@
+#this will map to existing tables in the database
+#views will handle the logic and pull from the models created here
 from django.conf import settings
 from django.db import models
 from cryptography.fernet import Fernet
