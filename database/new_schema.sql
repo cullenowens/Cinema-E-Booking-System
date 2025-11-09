@@ -234,3 +234,49 @@ CREATE TABLE IF NOT EXISTS `django_session` (
   KEY `django_session_expire_date_a5c62663` (`expire_date`)
 ); 
 
+-- Table for showrooms
+CREATE TABLE IF NOT EXISTS showrooms (
+	showroom_id INT AUTO_INCREMENT PRIMARY KEY,
+    showroom_name VARCHAR(50) NOT NULL
+);
+
+-- table for all seats (format: A1, B17, etc)
+CREATE TABLE IF NOT EXISTS seats (
+	seat_id INT AUTO_INCREMENT PRIMARY KEY,
+    showroom_id INT NOT NULL,
+    row_label CHAR(1) NOT NULL,	-- A, B, C etc
+    seat_number INT NOT NULL,	
+    FOREIGN KEY (showroom_id) REFERENCES showrooms(showroom_id),
+    UNIQUE (showroom_id, row_label, seat_number)
+);
+
+-- table for showings (movie at a specific time at a specific showroom)
+CREATE TABLE IF NOT EXISTS showings (
+    showing_id INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id INT NOT NULL,
+    showroom_id INT NOT NULL,
+    start_time DATETIME NOT NULL,
+    end_time DATETIME,
+    FOREIGN KEY (movie_id) REFERENCES Movies(movie_id),
+    FOREIGN KEY (showroom_id) REFERENCES showrooms(showroom_id),
+    UNIQUE (showroom_id, start_time)
+);
+
+-- table for bookings (when a user books tickets)
+CREATE TABLE IF NOT EXISTS bookings (
+	booking_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES auth_user(id)
+);
+
+-- table for singular tickets
+CREATE TABLE IF NOT EXISTS tickets (
+	ticket_id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    showing_id INT NOT NULL,
+    seat_id INT NOT NULL,
+    age_category ENUM('Child','Adult','Senior') NOT NULL,
+    FOREIGN KEY (booking_id) REFERENCES bookings(booking_id),
+    FOREIGN KEY (showing_id) REFERENCES showings(showing_id),
+    FOREIGN KEY (seat_id) REFERENCES seats(seat_id)
+);
