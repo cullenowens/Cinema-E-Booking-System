@@ -13,6 +13,7 @@ URL Structure:
 #this defines the specific routes for the cinema app and actual endpoints to logic
 #will only handle urls that config/urls.py sends to it
 from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
 from . import views, views_admin, views_auth
 
 urlpatterns = [
@@ -22,6 +23,10 @@ urlpatterns = [
     #Admin Promotions
     path('admin/promotions/', views_admin.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
     path('admin/promotions/<int:pk>/', views_admin.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
+    # Admin Authentication
+    path('api/admin/login/', csrf_exempt(views_admin.AdminLoginView.as_view()), name='admin-login'),
+    # Admin Home Page
+    path('admin/home/', views_admin.AdminHomeView.as_view(), name='admin-home'),
     #basic movie endpoints, no parameters necessary
     #GET /api/movies/ - get all movies with details
     path('api/movies/', views.get_all_movies, name='get_all_movies'),
@@ -104,3 +109,7 @@ urlpatterns += [
 # fetch('/api/movies/currently-running/')  → get_currently_running_movies()
 # fetch('/api/movies/search/?q=spider')    → search_movies_by_name()
 # fetch('/api/movies/genre/Action/')       → filter_movies_by_genre(request, genre_name='Action')
+
+# Admin Endpoints:
+# POST   /admin/login/                     → Admin login
+# GET    /admin/home/                      → Admin home page with statistics
