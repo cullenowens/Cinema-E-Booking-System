@@ -2,7 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import Navbar from "../../components/Navbar/Navbar";
 import { useNavigate } from "react-router-dom";
-import { getAddress, updateAddress, updateProfile } from "../../api";
+import {
+  getAddress,
+  updateAddress,
+  updatePassword,
+  updateProfile,
+} from "../../api";
 
 const ProfilePage = () => {
   const { user, logout } = useAuth();
@@ -63,6 +68,7 @@ const ProfilePage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     try {
       const result = await updateProfile({
         phone: formData.phone,
@@ -92,10 +98,34 @@ const ProfilePage = () => {
     window.location.href = "/";
   };
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = async (e) => {
     e.preventDefault();
-    console.log("Password change:", passwordData);
-    // TODO: send request to backend
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert("New passwords do not match.");
+      return;
+    }
+    try {
+      await updatePassword({
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword,
+      });
+
+      alert("Password updated successfully.");
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (err) {
+      console.error("Error updating password:", err.response);
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        "Failed to update password.";
+      alert(errorMsg);
+    }
+
     setShowPasswordModal(false);
   };
 
