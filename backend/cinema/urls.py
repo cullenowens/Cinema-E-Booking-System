@@ -77,8 +77,12 @@ urlpatterns += [
     #POST then use the token and new password the user inputs
 
     # Reset Password - POST /api/auth/reset-password/
-    # Resets password for logged in users (no code needed)
+    # Resets password
     path('api/auth/reset-password/', ResetPasswordView.as_view(), name='reset_password'),
+
+    #change password - POST /api/auth/change-password/
+    #changes password for users when they're logged in
+    path('api/auth/change-password/', views_auth.ChangePasswordView.as_view(), name='change_password'),
 
      # User Address - GET/POST/PUT /api/auth/address/
     # Manage user's billing address (one per user)
