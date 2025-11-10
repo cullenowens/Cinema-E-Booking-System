@@ -380,12 +380,60 @@ class ForgotPasswordView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class ResetPasswordView(APIView):
+    #using verif code, reset password
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            reset_code = request.data.get('reset_code')
+            new_password = request.data.get('new_password')
+
+            if not email or not reset_code or not new_password:
+                return Response({'error': 'Email, reset code, and new password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            #find user (has to be active)
+            user = User.objects.filter(email=email, is_active=True).first()
+
+            if not user:
+                return Response({'error': 'Invalid email or reset code'}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                profile = Profile.objects.get(user=user)
+            except Profile.DoesNotExist:
+                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            if profile.verification_code_created_at:
+                expiration_time = profile.verification_code_created_at + timedelta(minutes=5)
+                if timezone.now() > expiration_time:
+                    return Response({
+                        'error': 'Verification code has expired'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            if profile.verification_code != reset_code:
+                return Response({'error': 'Invalid reset code'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user.set_password(new_password)
+            user.save()
+
+            #clear reset code
+            profile.verification_code = None
+            profile.save()
+
+            print(f"User {user.username} password reset successfully")
+            return Response({'message': 'Password reset successful', 'success': True}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'error': 'Password reset failed',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ChangePasswordView(APIView):
     #called when user is already logged in
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         current_password = request.data.get('current_password')
         new_password = request.data.get('new_password')
+
 
         if not current_password or not new_password:
             return Response({'error': 'Current and new passwords are required'}, status=status.HTTP_400_BAD_REQUEST)
