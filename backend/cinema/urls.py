@@ -77,7 +77,7 @@ urlpatterns += [
     #POST then use the token and new password the user inputs
 
     # Reset Password - POST /api/auth/reset-password/
-    # Resets password using code from forgot-password email
+    # Resets password for logged in users (no code needed)
     path('api/auth/reset-password/', ResetPasswordView.as_view(), name='reset_password'),
 
      # User Address - GET/POST/PUT /api/auth/address/
