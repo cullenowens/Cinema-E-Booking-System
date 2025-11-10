@@ -154,20 +154,40 @@ class ProfileView(APIView):
 
     def get(self, request):
         try:
-            profile = Profile.objects.get(user=request.user)
-            serializer = ProfileSerializer(profile)
-            return Response(serializer.data)
+            #profile = Profile.objects.get(user=request.user)
+            #serializer = ProfileSerializer(profile)
+            user = request.user
+            return Response({
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "phone": user.profile.phone,
+                "subscribed": user.profile.subscribed,
+                "status": user.profile.status
+            })
         except Profile.DoesNotExist:
             return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request):
         try:
-            profile = Profile.objects.get(user=request.user)
-            serializer = ProfileSerializer(profile, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            user = request.user
+            profile = user.profile
+            
+            # Update User fields
+            user.first_name = request.data.get('first_name', user.first_name)
+            user.last_name = request.data.get('last_name', user.last_name)
+            user.email = request.data.get('email', user.email)
+            user.save()
+            
+            # Update Profile fields
+            profile.phone = request.data.get('phone', profile.phone)
+            profile.subscribed = request.data.get('subscribed', profile.subscribed)
+            profile.save()
+            
+            return Response({'message': 'Profile updated successfully'})
+    
         except Profile.DoesNotExist:
             return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
         
@@ -360,51 +380,29 @@ class ForgotPasswordView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class ResetPasswordView(APIView):
-    #using verif code, reset password
+    #called when user is already logged in
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        try:
-            email = request.data.get('email')
-            reset_code = request.data.get('reset_code')
-            new_password = request.data.get('new_password')
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
 
-            if not email or not reset_code or not new_password:
-                return Response({'error': 'Email, reset code, and new password are required'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            #find user (has to be active)
-            user = User.objects.filter(email=email, is_active=True).first()
+        if not current_password or not new_password:
+            return Response({'error': 'Current and new passwords are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not request.user.check_password(current_password):
+            return Response({'error': 'Current password is incorrect'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if current_password == new_password:
+            return Response({'error': 'New password must be different from current password'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if len(new_password) < 8:
+            return Response({'error': 'New password must be at least 8 characters long'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        request.user.set_password(new_password)
+        request.user.save()
 
-            if not user:
-                return Response({'error': 'Invalid email or reset code'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            try:
-                profile = Profile.objects.get(user=user)
-            except Profile.DoesNotExist:
-                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
-            
-            if profile.verification_code_created_at:
-                expiration_time = profile.verification_code_created_at + timedelta(minutes=5)
-                if timezone.now() > expiration_time:
-                    return Response({
-                        'error': 'Verification code has expired'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-
-            if profile.verification_code != reset_code:
-                return Response({'error': 'Invalid reset code'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            user.set_password(new_password)
-            user.save()
-
-            #clear reset code
-            profile.verification_code = None
-            profile.save()
-
-            print(f"User {user.username} password reset successfully")
-            return Response({'message': 'Password reset successful', 'success': True}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({
-                'error': 'Password reset failed',
-                'details': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
 
 
 # --- Address ---

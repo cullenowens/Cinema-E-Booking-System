@@ -37,14 +37,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
     class Meta:
-        model = User
-        fields = ["username", "email", "password", "first_name", "last_name", "subscribed"]
+        model = User #creating user model
+        fields = ["username", "phone_number", "password", "first_name", "last_name", "subscribed"]
 
 # Creates user and inactive profile (activated later)
     def create(self, validated_data):
         subscribed = validated_data.pop("subscribed", False)
+        #create user (in auth_user table)
         user = User.objects.create_user(**validated_data)
-        #create associated profile
+        #create associated profile (in cinema_profile table)
         Profile.objects.create(user=user, subscribed=subscribed, status="Inactive")
         #creates empty address for the user
         Address.objects.create(
@@ -87,10 +88,11 @@ class LoginSerializer(serializers.Serializer):
 # Serializes user profile details
 
 class ProfileSerializer(serializers.ModelSerializer):
-    #username = serializers.CharField(source='user.username', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
     #email = serializers.EmailField(source='user.email', read_only=True)
-    #first_name = serializers.CharField(source='user.first_name', read_only=True)
-    #last_name = serializers.CharField(source='user.last_name', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', required= False)
+    last_name = serializers.CharField(source='user.last_name', required=False)
+    phone_number = serializers.CharField(source='phone', required=False)
     class Meta:
         model = Profile
         fields = ["username", "email", "first_name", "last_name", "phone", "subscribed", "status"]
