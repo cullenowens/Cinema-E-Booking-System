@@ -26,7 +26,7 @@ urlpatterns = [
     # Admin Authentication
     path('api/admin/login/', csrf_exempt(views_admin.AdminLoginView.as_view()), name='admin-login'),
     # Admin Home Page
-    path('admin/home/', views_admin.AdminHomeView.as_view(), name='admin-home'),
+    path('api/admin/home/', views_admin.AdminHomeView.as_view(), name='admin-home'),
     #basic movie endpoints, no parameters necessary
     #GET /api/movies/ - get all movies with details
     path('api/movies/', views.get_all_movies, name='get_all_movies'),
@@ -111,5 +111,5 @@ urlpatterns += [
 # fetch('/api/movies/genre/Action/')       → filter_movies_by_genre(request, genre_name='Action')
 
 # Admin Endpoints:
-# POST   /admin/login/                     → Admin login
-# GET    /admin/home/                      → Admin home page with statistics
+# POST   /api/admin/login/                     → Admin login
+# GET    /api/admin/home/                      → Admin home page with statistics

@@ -73,14 +73,20 @@ class Profile(models.Model):
         return f"Profile<{self.user.email}>"
     
 class Promotion(models.Model):
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='promotions')
-    movie_title = models.CharField(max_length=255)
-    movie_description = models.TextField(blank=True, null=True)
-    discount_percentage = models.IntegerField()
+    promo_id = models.AutoField(primary_key=True)
+    discount = models.DecimalField(max_digits=5, decimal_places=2)
+    promo_code = models.CharField(max_length=100, unique=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        db_table = 'cinema_promotions'
+        managed = False
+
     def __str__(self):
-        return f"Promotion<{self.movie_title} - {self.discount_percentage}%>"
+        return f"Promotion<{self.promo_code} - {self.discount}%>"
     
 
 

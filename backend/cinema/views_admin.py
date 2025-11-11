@@ -75,6 +75,7 @@ class AdminLoginView(APIView):
             refresh.set_exp(lifetime=timedelta(days=7))
 
         # Publish admin login event
+        # NOT USING EVENTS ANYMORE
         event = Event(
             event_type=EventTypes.ADMIN_LOGIN,
             data={
@@ -107,7 +108,7 @@ class AdminHomeView(APIView):
             total_movies = Movie.objects.count()
             currently_running = Movie.objects.filter(movie_status='Currently Running').count()
             coming_soon = Movie.objects.filter(movie_status='Coming Soon').count()
-            active_promotions = Promotion.objects.filter(is_active=True).count()
+            active_promotions = Promotion.objects.count()
             total_users = User.objects.count()
             active_users = Profile.objects.filter(status='Active').count()
             total_showtimes = MovieShowtime.objects.count()
@@ -165,13 +166,7 @@ class AdminHomeView(APIView):
                 }
             }
 
-            # Log admin accessing home page
-            event = Event(
-                event_type=EventTypes.ADMIN_ACTION,
-                data={"action": "viewed_admin_home"},
-                user=request.user.username
-            )
-            event_bus.publish(event)
+            logger.info(f"Admin home page accessed by: {request.user.username}")
 
             return Response(response_data, status=status.HTTP_200_OK)
 
@@ -182,3 +177,58 @@ class AdminHomeView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
+# MOVIE MANAGEMENT
+class AdminMovieView(generics.CreateAPIView, generics.DestroyAPIView):
+    """
+    Admin movie management
+    
+    POST /api/admin/movies/ - Create new movie
+    DELETE /api/admin/movies/<id>/ - Delete movie
+    """
+    permission_classes = [IsAdminUser]
+    serializer_class = MovieSerializer
+    queryset = Movie.objects.all()
+
+# PROMOTION MANAGEMENT
+class AdminPromotionView(generics.CreateAPIView, generics.DestroyAPIView):
+    """
+    Admin promotion management
+    
+    POST /api/admin/promotions/ - Create new promotion
+    DELETE /api/admin/promotions/<id>/ - Delete promotion
+    """
+    permission_classes = [IsAdminUser]
+    serializer_class = PromotionSerializer
+    queryset = Promotion.objects.all()
+
+# ============================================================================
+# PLACEHOLDER VIEWS FOR USER AND SHOWTIME MANAGEMENT
+# These will be implemented in future updates
+# ============================================================================
+
+class AdminUserManagementView(APIView):
+    """
+    Placeholder for user management functionality
+    Will be implemented in future update
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        return Response({
+            "message": "User management coming soon",
+            "available_actions": ["view_users", "change_user_status", "delete_users"]
+        })
+
+
+class AdminShowtimeManagementView(APIView):
+    """
+    Placeholder for showtime management functionality
+    Will be implemented in future update
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        return Response({
+            "message": "Showtime management coming soon",
+            "available_actions": ["create_showtime", "update_showtime", "delete_showtime"]
+        })
