@@ -17,16 +17,37 @@ from django.views.decorators.csrf import csrf_exempt
 from . import views, views_admin, views_auth
 
 urlpatterns = [
+    # ADMIN ENDPOINTS
     #Admin Movies
     path('admin/movies/', views_admin.AdminMovieView.as_view(), name='admin-add-movie'),        # POST to add
     path('admin/movies/<int:pk>/', views_admin.AdminMovieView.as_view(), name='admin-remove-movie'),  # DELETE to remove
     #Admin Promotions
     path('admin/promotions/', views_admin.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
     path('admin/promotions/<int:pk>/', views_admin.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
+
     # Admin Authentication
     path('api/admin/login/', csrf_exempt(views_admin.AdminLoginView.as_view()), name='admin-login'),
     # Admin Home Page
     path('api/admin/home/', views_admin.AdminHomeView.as_view(), name='admin-home'),
+    # Admin Movie Management
+    path('api/admin/movies/', views_admin.AdminMovieListView.as_view(), name='admin-list-movies'),           # GET all movies
+    path('api/admin/movies/create/', views_admin.AdminMovieCreateView.as_view(), name='admin-create-movie'),  # POST to create
+    path('api/admin/movies/<int:pk>/', views_admin.AdminMovieDetailView.as_view(), name='admin-movie-detail'),  # GET/PUT/DELETE specific movie
+    
+    # Admin Genre List (for dropdown in add movie form)
+    path('api/admin/genres/', views_admin.AdminGenreListView.as_view(), name='admin-genres'),
+    
+    # Admin Promotions
+    path('api/admin/promotions/', views_admin.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
+    path('api/admin/promotions/<int:pk>/', views_admin.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
+    
+    # Admin User Management (placeholder)
+    path('api/admin/users/', views_admin.AdminUserManagementView.as_view(), name='admin-users'),
+    
+    # Admin Showtime Management (placeholder)
+    path('api/admin/showtimes/', views_admin.AdminShowtimeManagementView.as_view(), name='admin-showtimes'),
+
+    # PUBLIC MOVIE ENDPOINTS
     #basic movie endpoints, no parameters necessary
     #GET /api/movies/ - get all movies with details
     path('api/movies/', views.get_all_movies, name='get_all_movies'),
@@ -111,5 +132,11 @@ urlpatterns += [
 # fetch('/api/movies/genre/Action/')       → filter_movies_by_genre(request, genre_name='Action')
 
 # Admin Endpoints:
-# POST   /api/admin/login/                     → Admin login
-# GET    /api/admin/home/                      → Admin home page with statistics
+# POST  /api/admin/login/                  → Admin login
+# GET   /api/admin/home/                   → Admin home page with statistics
+# GET   /api/admin/genres/                 → Get all genres for dropdown
+# GET   /api/admin/movies/                 → List all movies
+# POST  /api/admin/movies/create/          → Create new movie
+# GET   /api/admin/movies/<id>/            → Get movie details
+# PUT   /api/admin/movies/<id>/            → Update movie
+# DELETE /api/admin/movies/<id>/           → Delete movie

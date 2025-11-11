@@ -2,20 +2,164 @@
 #or, takes info from frontend (password= serializers...), validates fields, then creates/updates database objects
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Profile, Movie, Promotion, PaymentCard, Address
+from .models import Profile, Movie, Promotion, PaymentCard, Address, Genre, MovieGenre
 
 # --- Movie Serializer ---
 # Handles Movie model serialization (for display or creation)
 
 class MovieSerializer(serializers.ModelSerializer):
-    #genres = GenreSerializer(many=True, source='moviegenre_set', read_only=True)
-    #showtimes = MovieShowtimeSerializer(many=True, read_only=True)
-
+    """
+    Serializer for Movie model with complete validation
+    Handles movie creation with genres
+    """
+    # Accept genres as a list of genre names or IDs
+    genres = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        write_only=True,
+        required=True,
+        help_text="List of genre names (e.g., ['Action', 'Comedy'])"
+    )
+    
     class Meta:
-        #takes a movie object from database
         model = Movie
-        #conversion for frontend
-        fields = ['movie_id', 'movie_title', 'movie_description', 'age_rating', 'poster_url', 'trailer_url', 'movie_status', 'genres', 'showtimes']
+        fields = [
+            'movie_id', 
+            'movie_title', 
+            'movie_description', 
+            'age_rating', 
+            'poster_url', 
+            'trailer_url', 
+            'movie_status',
+            'genres'
+        ]
+        read_only_fields = ['movie_id']
+    
+    def validate_movie_title(self, value):
+        """Ensure movie title is not empty and is unique"""
+        if not value or value.strip() == "":
+            raise serializers.ValidationError("Movie title cannot be empty")
+        
+        # Check for duplicate titles (case-insensitive)
+        if Movie.objects.filter(movie_title__iexact=value).exists():
+            # If updating, allow same title for same movie
+            if self.instance and self.instance.movie_title.lower() == value.lower():
+                return value
+            raise serializers.ValidationError("A movie with this title already exists")
+        
+        return value.strip()
+    
+    def validate_movie_description(self, value):
+        """Ensure description is provided and has minimum length"""
+        if not value or value.strip() == "":
+            raise serializers.ValidationError("Movie description is required")
+        
+        if len(value.strip()) < 10:
+            raise serializers.ValidationError("Movie description must be at least 10 characters")
+        
+        return value.strip()
+    
+    def validate_age_rating(self, value):
+        """Validate age rating is one of the standard ratings"""
+        valid_ratings = ['G', 'PG', 'PG-13', 'R', 'NC-17', 'NR']
+        
+        if not value or value.strip() == "":
+            raise serializers.ValidationError("Age rating is required")
+        
+        value = value.strip().upper()
+        
+        if value not in valid_ratings:
+            raise serializers.ValidationError(
+                f"Age rating must be one of: {', '.join(valid_ratings)}"
+            )
+        
+        return value
+    
+    def validate_poster_url(self, value):
+        """Validate poster URL is provided"""
+        if not value or value.strip() == "":
+            raise serializers.ValidationError("Poster URL is required")
+        
+        # Basic URL validation
+        if not (value.startswith('http://') or value.startswith('https://')):
+            raise serializers.ValidationError("Poster URL must be a valid URL starting with http:// or https://")
+        
+        return value.strip()
+    
+    def validate_trailer_url(self, value):
+        """Validate trailer URL is provided"""
+        if not value or value.strip() == "":
+            raise serializers.ValidationError("Trailer URL is required")
+        
+        # Basic URL validation
+        if not (value.startswith('http://') or value.startswith('https://')):
+            raise serializers.ValidationError("Trailer URL must be a valid URL starting with http:// or https://")
+        
+        return value.strip()
+    
+    def validate_movie_status(self, value):
+        """Validate movie status is valid"""
+        valid_statuses = ['Currently Running', 'Coming Soon']
+        
+        if not value:
+            raise serializers.ValidationError("Movie status is required")
+        
+        if value not in valid_statuses:
+            raise serializers.ValidationError(
+                f"Movie status must be one of: {', '.join(valid_statuses)}"
+            )
+        
+        return value
+    
+    def validate_genres(self, value):
+        """Validate that at least one genre is provided"""
+        if not value or len(value) == 0:
+            raise serializers.ValidationError("At least one genre is required")
+        
+        # Check that all genres exist in the database
+        for genre_name in value:
+            if not Genre.objects.filter(genre_name__iexact=genre_name).exists():
+                raise serializers.ValidationError(
+                    f"Genre '{genre_name}' does not exist. Please use valid genre names."
+                )
+        
+        return value
+    
+    def create(self, validated_data):
+        """Create movie with genres"""
+        # Extract genres from validated data
+        genres = validated_data.pop('genres', [])
+        
+        # Create the movie
+        movie = Movie.objects.create(**validated_data)
+        
+        # Add genres to the movie
+        for genre_name in genres:
+            genre = Genre.objects.get(genre_name__iexact=genre_name)
+            MovieGenre.objects.create(movie=movie, genre=genre)
+        
+        return movie
+    
+    def update(self, instance, validated_data):
+        """Update movie and its genres"""
+        # Extract genres if provided
+        genres = validated_data.pop('genres', None)
+        
+        # Update movie fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update genres if provided
+        if genres is not None:
+            # Remove existing genre associations
+            MovieGenre.objects.filter(movie=instance).delete()
+            
+            # Add new genres
+            for genre_name in genres:
+                genre = Genre.objects.get(genre_name__iexact=genre_name)
+                MovieGenre.objects.create(movie=instance, genre=genre)
+        
+        return instance
 
 # --- Promotion Serializer ---
 # Serializes promotions and their discount details
@@ -24,6 +168,7 @@ class PromotionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promotion
         fields = ['id', 'title', 'description', 'discount_percentage']
+        read_only_fields = ['promo_id', 'created_at']
 
 # --- User Registration Serializer ---
 # Creates new users and associated profiles
