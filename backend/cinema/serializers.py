@@ -177,21 +177,34 @@ class RegisterSerializer(serializers.ModelSerializer):
     #receives data from frontend for registration and validates it
     password = serializers.CharField(write_only=True)
     subscribed = serializers.BooleanField(write_only=True, required=False, default=False)
-    first_name = serializers.CharField(required=False, allow_blank=True)
-    last_name = serializers.CharField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=True)
 
 
     class Meta:
         model = User #creating user model
-        fields = ["username", "phone_number", "password", "first_name", "last_name", "subscribed"]
+        fields = ["username", "email", "phone_number", "password", "subscribed"]
+
+    def validate_email(self, value):
+        """Validate email format and uniqueness"""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email is already in use")
+        return value
+    
+    def validate_phone_number(self, value):
+        """Phone validation"""
+        phone_digits = ''.join(filter(str.isdigit, value))
+        if len(phone_digits) < 10:
+            raise serializers.ValidationError("Phone number must have at least 10 digits")
+        return value
 
 # Creates user and inactive profile (activated later)
     def create(self, validated_data):
         subscribed = validated_data.pop("subscribed", False)
+        phone_number = validated_data.pop("phone_number")
         #create user (in auth_user table)
         user = User.objects.create_user(**validated_data)
         #create associated profile (in cinema_profile table)
-        Profile.objects.create(user=user, subscribed=subscribed, status="Inactive")
+        Profile.objects.create(user=user, phone_number=phone_number, subscribed=subscribed, status="Inactive")
         #creates empty address for the user
         Address.objects.create(
             user=user,
@@ -233,14 +246,35 @@ class LoginSerializer(serializers.Serializer):
 # Serializes user profile details
 
 class ProfileSerializer(serializers.ModelSerializer):
+    #user fields
     username = serializers.CharField(source='user.username', read_only=True)
-    #email = serializers.EmailField(source='user.email', read_only=True)
-    first_name = serializers.CharField(source='user.first_name', required= False)
-    last_name = serializers.CharField(source='user.last_name', required=False)
-    phone_number = serializers.CharField(source='phone', required=False)
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name', required= False, allow_blank=True)
+    last_name = serializers.CharField(source='user.last_name', required=False, allow_blank=True)
+    #profile fields
+    phone_number = serializers.CharField(required=False, allow_blank=True)
+    subscribed = serializers.BooleanField()
+    status = serializers.CharField(read_only=True)
+
+     #update user and profile fields
     class Meta:
         model = Profile
         fields = ["username", "email", "first_name", "last_name", "phone", "subscribed", "status"]
+
+    def update(self, instance, validated_data):
+        #update user fields
+        user_data = validated_data.pop('user', {})
+        user = instance.user
+        #update user model fields
+        user.first_name = user_data.get('first_name', user.first_name)
+        user.last_name = user_data.get('last_name', user.last_name)
+        user.email = user_data.get('email', user.email)
+        user.save()
+        #update profile fields
+        instance.phone_number = validated_data.get('phone_number', instance.phone_number)
+        instance.subscribed = validated_data.get('subscribed', instance.subscribed)
+        instance.save()
+        return instance
 
 
 # --- Address Serializer ---
@@ -354,3 +388,17 @@ class PaymentCardSerializer(serializers.ModelSerializer):
         validated_data.pop('card_number', None)
         # updates other fields using parent update method
         return super().update(instance, validated_data)
+    
+class UserDetailSerializer(serializers.ModelSerializer):
+    #user for displaying user info
+    #read-only!!
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    phone_number = serializers.CharField()
+    subscribed = serializers.BooleanField()
+    status = serializers.CharField(read_only=True)
+    class Meta:
+        model = Profile
+        fields = ["username", "email", "first_name", "last_name", "phone_number", "subscribed", "status"]

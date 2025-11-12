@@ -66,7 +66,7 @@ urlpatterns = [
 ]
 
 # AUTHENTICATION & PROFILE ENDPOINTS
-from .views_auth import RegisterView, LoginView, LogoutView, ProfileView, verify_email, ForgotPasswordView, ResetPasswordView
+from .views_auth import RegisterView, LoginView, LogoutView, ProfileView, verify_email, ForgotPasswordView, ResetPasswordView, UserDetailSerializer
 
 urlpatterns += [
     #POST path to register + first name, last name, password, subscribed
@@ -121,6 +121,10 @@ urlpatterns += [
     # Payment Card Detail - GET/PUT/DELETE /api/auth/payment-cards/<id>/
     # Retrieve, update, or delete specific payment card
     path('api/auth/payment-cards/<int:pk>/', views_auth.PaymentCardDetailView.as_view(), name='payment_card_detail'),
+
+    # User Details - GET /api/auth/user-details/
+    # Retrieve basic user details
+    path('api/auth/user-details/', views_auth.UserDetailView.as_view(), name='user_details'),
 ]
 
 #Help:
