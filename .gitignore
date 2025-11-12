@@ -53,3 +53,11 @@ build/
 
 # Test files (optional - you might want to keep these)
 test_api.http
+
+# Django media and static files
+media/
+staticfiles/
+
+# Frontend build output
+frontend/dist/
+frontend/.vite/

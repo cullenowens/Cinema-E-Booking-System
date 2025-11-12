@@ -28,10 +28,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-_-)3l=o*-i77%&!f7e$jvk39)56=km8b$x=t7jzu8&c78f8^8u'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:5173", "http://localhost:5173"]
@@ -87,7 +87,7 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-#Mailgun settings
+# Email Configuration
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST")
 EMAIL_PORT = 587
@@ -184,7 +184,4 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Encryption key for payment cards
 # In production, store this in environment variables for security!
-CARD_ENCRYPTION_KEY = os.environ.get(
-    'CARD_ENCRYPTION_KEY', 
-    'xFcbU7nR8wJ3tY6vA9sD2gK5hN8bE1mC4oP7qT0wZ3x='  # Default key for development
-)
+CARD_ENCRYPTION_KEY = os.getenv('CARD_ENCRYPTION_KEY')
