@@ -140,12 +140,33 @@ urlpatterns += [
 # fetch('/api/movies/search/?q=spider')    → search_movies_by_name()
 # fetch('/api/movies/genre/Action/')       → filter_movies_by_genre(request, genre_name='Action')
 
-# Admin Endpoints:
-# POST  /api/admin/login/                  → Admin login
-# GET   /api/admin/home/                   → Admin home page with statistics
-# GET   /api/admin/genres/                 → Get all genres for dropdown
-# GET   /api/admin/movies/                 → List all movies
-# POST  /api/admin/movies/create/          → Create new movie
-# GET   /api/admin/movies/<id>/            → Get movie details
-# PUT   /api/admin/movies/<id>/            → Update movie
-# DELETE /api/admin/movies/<id>/           → Delete movie
+
+
+# ADMIN ENDPOINTS SUMMARY
+# 
+# Authentication:
+# POST   /api/admin/login/                     → Admin login
+# 
+# Dashboard:
+# GET    /api/admin/home/                      → Admin home with menu & stats
+# 
+# Movies:
+# GET    /api/admin/movies/                    → List all movies
+# POST   /api/admin/movies/create/             → Create movie
+# GET    /api/admin/movies/<id>/               → Get movie details
+# PUT    /api/admin/movies/<id>/               → Update movie
+# DELETE /api/admin/movies/<id>/               → Delete movie
+# GET    /api/admin/genres/                    → List genres
+# 
+# Showrooms:
+# GET    /api/admin/showrooms/                 → List showrooms
+# 
+# Showings (Schedule):
+# GET    /api/admin/showings/                  → List showings (filters: movie_id, showroom_id, date)
+# POST   /api/admin/showings/create/           → Schedule movie
+# GET    /api/admin/showings/<id>/             → Get showing details
+# PUT    /api/admin/showings/<id>/             → Update showing
+# DELETE /api/admin/showings/<id>/             → Delete showing
+# GET    /api/admin/showings/availability/     → Check availability
+# 
+# Promotions:
