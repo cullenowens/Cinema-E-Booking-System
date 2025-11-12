@@ -42,10 +42,19 @@ urlpatterns = [
     path('api/admin/promotions/<int:pk>/', views_admin.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
     
     # Admin User Management (placeholder)
-    path('api/admin/users/', views_admin.AdminUserManagementView.as_view(), name='admin-users'),
+    #path('api/admin/users/', views_admin.AdminUserManagementView.as_view(), name='admin-users'),
     
     # Admin Showtime Management (placeholder)
-    path('api/admin/showtimes/', views_admin.AdminShowtimeManagementView.as_view(), name='admin-showtimes'),
+    #path('api/admin/showtimes/', views_admin.AdminShowtimeManagementView.as_view(), name='admin-showtimes'),
+
+    # Admin Showroom Management
+    path('api/admin/showrooms/', views_admin.AdminShowroomListView.as_view(), name='admin-showrooms'),
+    
+    # Admin Showing Management (Schedule Movies)
+    path('api/admin/showings/', views_admin.AdminShowingListView.as_view(), name='admin-showings-list'),
+    path('api/admin/showings/create/', views_admin.AdminShowingCreateView.as_view(), name='admin-showings-create'),
+    path('api/admin/showings/availability/', views_admin.AdminShowingAvailabilityView.as_view(), name='admin-showings-availability'),
+    path('api/admin/showings/<int:pk>/', views_admin.AdminShowingDetailView.as_view(), name='admin-showings-detail'),
 
     # PUBLIC MOVIE ENDPOINTS
     #basic movie endpoints, no parameters necessary
