@@ -27,7 +27,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from django.contrib.auth.models import User
 from .models import Profile, PaymentCard, Address
-from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, PaymentCardSerializer, AddressSerializer
+from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, PaymentCardSerializer, AddressSerializer, UserDetailSerializer
 
 # --- Registration ---
 class RegisterView(generics.CreateAPIView):
@@ -153,40 +153,22 @@ class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        try:
-            #profile = Profile.objects.get(user=request.user)
-            #serializer = ProfileSerializer(profile)
-            user = request.user
-            return Response({
-                "username": user.username,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "phone": user.profile.phone,
-                "subscribed": user.profile.subscribed,
-                "status": user.profile.status
-            })
-        except Profile.DoesNotExist:
-            return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        profile = request.user.profile
+        serializer = UserDetailSerializer(profile)
+        return Response(serializer.data)
 
     def put(self, request):
         try:
-
-            user = request.user
-            profile = user.profile
+            #calls the profile of the logged in user
+            profile = request.user.profile
+            #updates the profile with new data
+            serializer = ProfileSerializer(profile, data=request.data, partial=True)
             
-            # Update User fields
-            user.first_name = request.data.get('first_name', user.first_name)
-            user.last_name = request.data.get('last_name', user.last_name)
-            user.email = request.data.get('email', user.email)
-            user.save()
-            
-            # Update Profile fields
-            profile.phone = request.data.get('phone', profile.phone)
-            profile.subscribed = request.data.get('subscribed', profile.subscribed)
-            profile.save()
-            
-            return Response({'message': 'Profile updated successfully'})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            #error
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
         except Profile.DoesNotExist:
             return Response({"error": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
