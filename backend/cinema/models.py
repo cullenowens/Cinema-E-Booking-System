@@ -59,6 +59,35 @@ class MovieShowtime(models.Model):
     def __str__(self):
         return f"{self.movie.movie_title} - {self.showtime_value}"
     
+class Showroom(models.Model):
+    """Model for movie showrooms/theaters"""
+    showroom_id = models.AutoField(primary_key=True)
+    showroom_name = models.CharField(max_length=50)
+
+    class Meta:
+        db_table = 'showrooms'
+        managed = False
+
+    def __str__(self):
+        return self.showroom_name
+
+
+class Showing(models.Model):
+    """Model for movie showings (scheduled screenings)"""
+    showing_id = models.AutoField(primary_key=True)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
+    showroom = models.ForeignKey(Showroom, on_delete=models.CASCADE, db_column='showroom_id')
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'showings'
+        managed = False
+        unique_together = ('showroom', 'start_time')
+
+    def __str__(self):
+        return f"{self.movie.movie_title} - {self.showroom.showroom_name} - {self.start_time}"
+    
 
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")

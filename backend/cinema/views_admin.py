@@ -12,9 +12,11 @@ from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from datetime import timedelta
 from django.db.models import Count
+from django.db.models import Q
+from datetime import datetime, timedelta
 
-from .models import Movie, Promotion, Profile, MovieShowtime, Genre, MovieGenre
-from .serializers import MovieSerializer, PromotionSerializer
+from .models import Movie, Promotion, Profile, MovieShowtime, Genre, MovieGenre, Showroom, Showing
+from .serializers import MovieSerializer, PromotionSerializer, ShowingSerializer, ShowroomSerializer
 from .events import event_bus, Event, EventTypes
 
 import logging
@@ -430,34 +432,296 @@ class AdminPromotionView(generics.CreateAPIView, generics.DestroyAPIView):
     serializer_class = PromotionSerializer
     queryset = Promotion.objects.all()
 
-# ============================================================================
-# PLACEHOLDER VIEWS FOR USER AND SHOWTIME MANAGEMENT
-# These will be implemented in future updates
-# ============================================================================
-
-class AdminUserManagementView(APIView):
+# ADD SHOWROOM MANAGEMENT  
+class AdminShowroomListView(APIView):
     """
-    Placeholder for user management functionality
-    Will be implemented in future update
+    Get all showrooms
+    
+    GET /api/admin/showrooms/
     """
     permission_classes = [IsAuthenticated, IsAdminUser]
-
+    
     def get(self, request):
-        return Response({
-            "message": "User management coming soon",
-            "available_actions": ["view_users", "change_user_status", "delete_users"]
-        })
+        """Get all showrooms for dropdown selection"""
+        try:
+            showrooms = Showroom.objects.all().order_by('showroom_name')
+            serializer = ShowroomSerializer(showrooms, many=True)
+            
+            return Response({
+                'count': len(serializer.data),
+                'showrooms': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving showrooms: {e}")
+            return Response(
+                {"error": "Failed to retrieve showrooms"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
-class AdminShowtimeManagementView(APIView):
+class AdminShowingListView(APIView):
     """
-    Placeholder for showtime management functionality
-    Will be implemented in future update
+    List all showings with optional filters
+    
+    GET /api/admin/showings/
+    Query params:
+    - movie_id: Filter by movie
+    - showroom_id: Filter by showroom
+    - date: Filter by date (YYYY-MM-DD)
     """
     permission_classes = [IsAuthenticated, IsAdminUser]
-
+    
     def get(self, request):
-        return Response({
-            "message": "Showtime management coming soon",
-            "available_actions": ["create_showtime", "update_showtime", "delete_showtime"]
-        })
+        """Get all showings with optional filtering"""
+        try:
+            showings = Showing.objects.all().select_related('movie', 'showroom')
+            
+            # Apply filters
+            movie_id = request.query_params.get('movie_id')
+            if movie_id:
+                showings = showings.filter(movie_id=movie_id)
+            
+            showroom_id = request.query_params.get('showroom_id')
+            if showroom_id:
+                showings = showings.filter(showroom_id=showroom_id)
+            
+            date_str = request.query_params.get('date')
+            if date_str:
+                try:
+                    date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    showings = showings.filter(start_time__date=date)
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid date format. Use YYYY-MM-DD"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Order by start time
+            showings = showings.order_by('start_time')
+            
+            # Serialize
+            serializer = ShowingSerializer(showings, many=True)
+            
+            return Response({
+                'count': len(serializer.data),
+                'showings': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving showings: {e}")
+            return Response(
+                {"error": "Failed to retrieve showings"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AdminShowingCreateView(APIView):
+    """
+    Create a new showing (schedule a movie)
+    
+    POST /api/admin/showings/create/
+    
+    Request body:
+    {
+        "movie_id": 1,
+        "showroom_id": 1,
+        "start_time": "2025-12-25T19:00:00",
+        "end_time": "2025-12-25T21:30:00"  // optional
+    }
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def post(self, request):
+        """Create a new showing with conflict detection"""
+        try:
+            serializer = ShowingSerializer(data=request.data)
+            
+            if serializer.is_valid():
+                showing = serializer.save()
+                
+                logger.info(
+                    f"Showing created: {showing.movie.movie_title} in "
+                    f"{showing.showroom.showroom_name} at {showing.start_time} "
+                    f"by admin {request.user.username}"
+                )
+                
+                return Response({
+                    'message': 'Showing scheduled successfully',
+                    'showing': ShowingSerializer(showing).data
+                }, status=status.HTTP_201_CREATED)
+            
+            # Return validation errors (including conflict errors)
+            return Response({
+                'error': 'Validation failed',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            logger.error(f"Error creating showing: {e}")
+            return Response(
+                {"error": f"Failed to create showing: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AdminShowingDetailView(APIView):
+    """
+    Get, update, or delete a specific showing
+    
+    GET /api/admin/showings/<id>/
+    PUT /api/admin/showings/<id>/
+    DELETE /api/admin/showings/<id>/
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def get(self, request, pk):
+        """Get showing details"""
+        try:
+            showing = Showing.objects.select_related('movie', 'showroom').get(pk=pk)
+            serializer = ShowingSerializer(showing)
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Showing.DoesNotExist:
+            return Response(
+                {"error": "Showing not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving showing: {e}")
+            return Response(
+                {"error": "Failed to retrieve showing"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def put(self, request, pk):
+        """Update showing"""
+        try:
+            showing = Showing.objects.get(pk=pk)
+            serializer = ShowingSerializer(showing, data=request.data, partial=True)
+            
+            if serializer.is_valid():
+                updated_showing = serializer.save()
+                
+                logger.info(
+                    f"Showing updated: {updated_showing.movie.movie_title} "
+                    f"by admin {request.user.username}"
+                )
+                
+                return Response({
+                    'message': 'Showing updated successfully',
+                    'showing': ShowingSerializer(updated_showing).data
+                }, status=status.HTTP_200_OK)
+            
+            return Response({
+                'error': 'Validation failed',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Showing.DoesNotExist:
+            return Response(
+                {"error": "Showing not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error updating showing: {e}")
+            return Response(
+                {"error": f"Failed to update showing: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def delete(self, request, pk):
+        """Delete showing"""
+        try:
+            showing = Showing.objects.select_related('movie', 'showroom').get(pk=pk)
+            showing_info = f"{showing.movie.movie_title} in {showing.showroom.showroom_name} at {showing.start_time}"
+            
+            showing.delete()
+            
+            logger.info(f"Showing deleted: {showing_info} by admin {request.user.username}")
+            
+            return Response({
+                'message': f'Showing deleted successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Showing.DoesNotExist:
+            return Response(
+                {"error": "Showing not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error deleting showing: {e}")
+            return Response(
+                {"error": "Failed to delete showing"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AdminShowingAvailabilityView(APIView):
+    """
+    Check showroom availability for a given date/time
+    
+    GET /api/admin/showings/availability/
+    Query params:
+    - showroom_id: Required
+    - start_time: Required (ISO format: 2025-12-25T19:00:00)
+    - end_time: Optional (defaults to start_time + 2.5 hours)
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def get(self, request):
+        """Check if a showroom is available at given time"""
+        try:
+            showroom_id = request.query_params.get('showroom_id')
+            start_time_str = request.query_params.get('start_time')
+            end_time_str = request.query_params.get('end_time')
+            
+            if not showroom_id or not start_time_str:
+                return Response({
+                    "error": "showroom_id and start_time are required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Parse times
+            try:
+                start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                if end_time_str:
+                    end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+                else:
+                    end_time = start_time + timedelta(hours=2, minutes=30)
+            except ValueError:
+                return Response({
+                    "error": "Invalid datetime format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check for conflicts
+            conflicts = Showing.objects.filter(
+                showroom_id=showroom_id
+            ).filter(
+                Q(start_time__lt=end_time, end_time__gt=start_time) |
+                Q(start_time__gte=start_time, start_time__lt=end_time)
+            ).select_related('movie')
+            
+            if conflicts.exists():
+                conflict_list = [{
+                    'movie_title': c.movie.movie_title,
+                    'start_time': c.start_time.isoformat(),
+                    'end_time': c.end_time.isoformat()
+                } for c in conflicts]
+                
+                return Response({
+                    'available': False,
+                    'conflicts': conflict_list
+                }, status=status.HTTP_200_OK)
+            
+            return Response({
+                'available': True,
+                'message': 'Showroom is available for the requested time'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error checking availability: {e}")
+            return Response(
+                {"error": "Failed to check availability"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

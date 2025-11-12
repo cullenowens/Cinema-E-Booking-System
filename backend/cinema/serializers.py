@@ -2,7 +2,10 @@
 #or, takes info from frontend (password= serializers...), validates fields, then creates/updates database objects
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Profile, Movie, Promotion, PaymentCard, Address, Genre, MovieGenre
+from datetime import timedelta
+from django.utils import timezone
+from django.db import models
+from .models import Profile, Movie, Promotion, PaymentCard, Address, Genre, MovieGenre, Showing, Showroom
 
 # --- Movie Serializer ---
 # Handles Movie model serialization (for display or creation)
@@ -159,6 +162,141 @@ class MovieSerializer(serializers.ModelSerializer):
                 genre = Genre.objects.get(genre_name__iexact=genre_name)
                 MovieGenre.objects.create(movie=instance, genre=genre)
         
+        return instance
+    
+class ShowroomSerializer(serializers.ModelSerializer):
+    """Serializer for Showroom model"""
+    
+    class Meta:
+        model = Showroom
+        fields = ['showroom_id', 'showroom_name']
+        read_only_fields = ['showroom_id']
+
+
+class ShowingSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Showing model with conflict detection
+    """
+    movie_id = serializers.IntegerField(write_only=True)
+    showroom_id = serializers.IntegerField(write_only=True)
+    
+    # Read-only fields for display
+    movie_title = serializers.CharField(source='movie.movie_title', read_only=True)
+    showroom_name = serializers.CharField(source='showroom.showroom_name', read_only=True)
+    
+    class Meta:
+        model = Showing
+        fields = [
+            'showing_id',
+            'movie_id',
+            'movie_title',
+            'showroom_id', 
+            'showroom_name',
+            'start_time',
+            'end_time'
+        ]
+        read_only_fields = ['showing_id']
+    
+    def validate_movie_id(self, value):
+        """Validate that movie exists"""
+        if not Movie.objects.filter(movie_id=value).exists():
+            raise serializers.ValidationError(f"Movie with ID {value} does not exist")
+        return value
+    
+    def validate_showroom_id(self, value):
+        """Validate that showroom exists"""
+        if not Showroom.objects.filter(showroom_id=value).exists():
+            raise serializers.ValidationError(f"Showroom with ID {value} does not exist")
+        return value
+    
+    def validate_start_time(self, value):
+        """Validate that start time is in the future"""
+        if value < timezone.now():
+            raise serializers.ValidationError("Start time must be in the future")
+        return value
+    
+    def validate(self, data):
+        """
+        Validate that there are no scheduling conflicts
+        Check if the showroom is available at the requested time
+        """
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        showroom_id = data.get('showroom_id')
+        
+        # If end_time not provided, estimate it (assume 2.5 hour movie)
+        if not end_time:
+            end_time = start_time + timedelta(hours=2, minutes=30)
+            data['end_time'] = end_time
+        
+        # Validate end_time is after start_time
+        if end_time <= start_time:
+            raise serializers.ValidationError({
+                "end_time": "End time must be after start time"
+            })
+        
+        # Check for conflicts in the same showroom
+        # A conflict exists if:
+        # 1. Another showing starts during this showing
+        # 2. This showing starts during another showing
+        # 3. Showings overlap in any way
+        
+        conflicts = Showing.objects.filter(
+            showroom_id=showroom_id
+        ).filter(
+            models.Q(
+                # Case 1: New showing starts during existing showing
+                start_time__lt=end_time,
+                end_time__gt=start_time
+            ) | models.Q(
+                # Case 2: Existing showing starts during new showing
+                start_time__gte=start_time,
+                start_time__lt=end_time
+            )
+        )
+        
+        # Exclude current instance if updating
+        if self.instance:
+            conflicts = conflicts.exclude(showing_id=self.instance.showing_id)
+        
+        if conflicts.exists():
+            conflict = conflicts.first()
+            raise serializers.ValidationError({
+                "conflict": f"Showroom '{conflict.showroom.showroom_name}' is already booked for '{conflict.movie.movie_title}' from {conflict.start_time.strftime('%Y-%m-%d %I:%M %p')} to {conflict.end_time.strftime('%I:%M %p')}"
+            })
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create showing with movie and showroom"""
+        movie_id = validated_data.pop('movie_id')
+        showroom_id = validated_data.pop('showroom_id')
+        
+        movie = Movie.objects.get(movie_id=movie_id)
+        showroom = Showroom.objects.get(showroom_id=showroom_id)
+        
+        showing = Showing.objects.create(
+            movie=movie,
+            showroom=showroom,
+            **validated_data
+        )
+        
+        return showing
+    
+    def update(self, instance, validated_data):
+        """Update showing"""
+        movie_id = validated_data.pop('movie_id', None)
+        showroom_id = validated_data.pop('showroom_id', None)
+        
+        if movie_id:
+            instance.movie = Movie.objects.get(movie_id=movie_id)
+        if showroom_id:
+            instance.showroom = Showroom.objects.get(showroom_id=showroom_id)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
         return instance
 
 # --- Promotion Serializer ---
