@@ -288,6 +288,9 @@ def verify_email(request):
         # Verify code matches
         if profile.verification_code == verification_code:
             # SUCCESS: Activate the user
+            profile.verification_code = None
+            profile.verification_code_created_at = None
+            profile.save()
             user.is_active = True
             user.save()
             
