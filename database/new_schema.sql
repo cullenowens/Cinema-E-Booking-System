@@ -258,14 +258,14 @@ CREATE TABLE IF NOT EXISTS showings (
     start_time DATETIME NOT NULL,
     end_time DATETIME,
     FOREIGN KEY (movie_id) REFERENCES Movies(movie_id),
-    FOREIGN KEY (showroom_id) REFERENCES showrooms(showroom_id),
-    UNIQUE (showroom_id, start_time)
+    FOREIGN KEY (showroom_id) REFERENCES showrooms(showroom_id)
 );
 
 -- table for bookings (when a user books tickets)
 CREATE TABLE IF NOT EXISTS bookings (
 	booking_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    booking_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES auth_user(id)
 );
 
@@ -278,5 +278,21 @@ CREATE TABLE IF NOT EXISTS tickets (
     age_category ENUM('Child','Adult','Senior') NOT NULL,
     FOREIGN KEY (booking_id) REFERENCES bookings(booking_id),
     FOREIGN KEY (showing_id) REFERENCES showings(showing_id),
-    FOREIGN KEY (seat_id) REFERENCES seats(seat_id)
+    FOREIGN KEY (seat_id) REFERENCES seats(seat_id),
+    UNIQUE (booking_id, showing_id, seat_id)
+);
+
+-- table for holding reservations (seat selected but not booked)
+CREATE TABLE IF NOT EXISTS seat_reservation (
+	id INT AUTO_INCREMENT PRIMARY KEY,
+    showing_id INT NOT NULL,
+    seat_id INT NOT NULL,
+    user_id INT NOT NULL,
+    reserved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,	-- 5 min after reserved time
+    is_confirmed BOOLEAN DEFAULT FALSE,	-- if seat has been checked out
+    FOREIGN KEY (showing_id) REFERENCES showings(showing_id),
+    FOREIGN KEY (seat_id) REFERENCES seats(seat_id),
+    FOREIGN KEY (user_id) REFERENCES auth_user(id),
+    UNIQUE (showing_id, seat_id, user_id)	-- multiple users can't select the same seat for same time
 );
