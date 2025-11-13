@@ -303,10 +303,86 @@ class ShowingSerializer(serializers.ModelSerializer):
 # Serializes promotions and their discount details
 
 class PromotionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Promotion with comprehensive validation
+    """
     class Meta:
         model = Promotion
-        fields = ['id', 'title', 'description', 'discount_percentage']
+        fields = ['promo_id', 'discount', 'promo_code', 'start_date', 'end_date', 'created_at']
         read_only_fields = ['promo_id', 'created_at']
+
+    def validate_promo_code(self, value):
+        """Validate promo code is unique and properly formatted"""
+        if not value or value.strip() == "":
+            raise serializers.ValidationError("Promo code cannot be empty")
+        
+        # Convert to uppercase and remove extra spaces
+        value = value.strip().upper()
+        
+        # Check for minimum length
+        if len(value) < 3:
+            raise serializers.ValidationError("Promo code must be at least 3 characters")
+        
+        # Check for valid characters (letters, numbers, hyphens, underscores)
+        import re
+        if not re.match(r'^[A-Z0-9_-]+$', value):
+            raise serializers.ValidationError(
+                "Promo code can only contain letters, numbers, hyphens, and underscores"
+            )
+        
+        # Check for uniqueness (case-insensitive)
+        if Promotion.objects.filter(promo_code__iexact=value).exists():
+            # If updating, allow same promo code for same promotion
+            if self.instance and self.instance.promo_code.upper() == value:
+                return value
+            raise serializers.ValidationError("A promotion with this code already exists")
+        
+        return value
+    
+    def validate_discount(self, value):
+        """Validate discount is within valid range"""
+        if value is None:
+            raise serializers.ValidationError("Discount is required")
+        
+        if value <= 0:
+            raise serializers.ValidationError("Discount must be greater than 0")
+        
+        if value > 100:
+            raise serializers.ValidationError("Discount cannot exceed 100%")
+        
+        return value
+    
+    def validate_start_date(self, value):
+        """Validate start date"""
+        if not value:
+            raise serializers.ValidationError("Start date is required")
+        
+        from datetime import date
+        # Allow promotions to start today or in the future
+        if value < date.today():
+            raise serializers.ValidationError("Start date cannot be in the past")
+        
+        return value
+    
+    def validate_end_date(self, value):
+        """Validate end date"""
+        if not value:
+            raise serializers.ValidationError("End date is required")
+        
+        return value
+    
+    def validate(self, data):
+        """Validate that end date is after start date"""
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if start_date and end_date:
+            if end_date <= start_date:
+                raise serializers.ValidationError({
+                    "end_date": "End date must be after start date"
+                })
+        
+        return data
 
 # --- User Registration Serializer ---
 # Creates new users and associated profiles

@@ -14,10 +14,11 @@ from datetime import timedelta
 from django.db.models import Count
 from django.db.models import Q
 from datetime import datetime, timedelta
+from django.core.mail import send_mail
+from django.conf import settings
 
 from .models import Movie, Promotion, Profile, MovieShowtime, Genre, MovieGenre, Showroom, Showing
 from .serializers import MovieSerializer, PromotionSerializer, ShowingSerializer, ShowroomSerializer
-from .events import event_bus, Event, EventTypes
 
 import logging
 
@@ -75,18 +76,6 @@ class AdminLoginView(APIView):
         
         if remember_me:
             refresh.set_exp(lifetime=timedelta(days=7))
-
-        # Publish admin login event
-        # NOT USING EVENTS ANYMORE
-        event = Event(
-            event_type=EventTypes.ADMIN_LOGIN,
-            data={
-                "username": user.username,
-                "login_time": str(refresh.access_token.payload['iat'])
-            },
-            user=user.username
-        )
-        event_bus.publish(event)
 
         return Response({
             "refresh": str(refresh),
@@ -421,16 +410,330 @@ class AdminGenreListView(APIView):
             )
 
 # PROMOTION MANAGEMENT
-class AdminPromotionView(generics.CreateAPIView, generics.DestroyAPIView):
+class AdminPromotionListView(APIView):
     """
-    Admin promotion management
+    List all promotions
     
-    POST /api/admin/promotions/ - Create new promotion
-    DELETE /api/admin/promotions/<id>/ - Delete promotion
+    GET /api/admin/promotions/
     """
-    permission_classes = [IsAdminUser]
-    serializer_class = PromotionSerializer
-    queryset = Promotion.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def get(self, request):
+        """Get all promotions ordered by creation date"""
+        try:
+            promotions = Promotion.objects.all().order_by('-created_at')
+            serializer = PromotionSerializer(promotions, many=True)
+            
+            return Response({
+                'count': len(serializer.data),
+                'promotions': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving promotions: {e}")
+            return Response(
+                {"error": "Failed to retrieve promotions"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+class AdminPromotionCreateView(APIView):
+    """
+    Create a new promotion and optionally email it to subscribed users
+    
+    POST /api/admin/promotions/create/
+    
+    Request body:
+    {
+        "promo_code": "SUMMER2026",
+        "discount": 20.00,
+        "start_date": "2026-06-01",
+        "end_date": "2026-08-31",
+        "send_email": true  // optional, defaults to false
+    }
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def post(self, request):
+        """Create a new promotion with validation"""
+        try:
+            # Extract send_email flag (not part of model)
+            send_email_flag = request.data.pop('send_email', False)
+            
+            serializer = PromotionSerializer(data=request.data)
+            
+            if serializer.is_valid():
+                promotion = serializer.save()
+                
+                logger.info(
+                    f"Promotion created: {promotion.promo_code} "
+                    f"({promotion.discount}% off) by admin {request.user.username}"
+                )
+                
+                # Send emails to subscribed users if requested
+                emails_sent = 0
+                if send_email_flag:
+                    emails_sent = self.send_promotion_emails(promotion)
+                
+                response_data = {
+                    'message': 'Promotion created successfully',
+                    'promotion': PromotionSerializer(promotion).data
+                }
+                
+                if send_email_flag:
+                    response_data['emails_sent'] = emails_sent
+                    response_data['email_message'] = f'Promotion email sent to {emails_sent} subscribed users'
+                
+                return Response(response_data, status=status.HTTP_201_CREATED)
+            
+            # Return validation errors
+            return Response({
+                'error': 'Validation failed',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            logger.error(f"Error creating promotion: {e}")
+            return Response(
+                {"error": f"Failed to create promotion: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def send_promotion_emails(self, promotion):
+        """Send promotion email to all subscribed users"""
+        # Get all users who are subscribed to promotions
+        subscribed_users = User.objects.filter(
+            profile__subscribed=True,
+            is_active=True
+        ).exclude(email='')
+        
+        emails_sent = 0
+        
+        # Email subject and message
+        subject = f"🎉 Special Offer: {promotion.discount}% Off!"
+        message = f"""
+Hello!
+
+We have an exciting promotion for you!
+
+Promo Code: {promotion.promo_code}
+Discount: {promotion.discount}% OFF
+Valid From: {promotion.start_date.strftime('%B %d, %Y')}
+Valid Until: {promotion.end_date.strftime('%B %d, %Y')}
+
+Use code "{promotion.promo_code}" at checkout to get {promotion.discount}% off your ticket purchase!
+
+Don't miss out on this limited-time offer!
+
+Best regards,
+Cinema E-Booking Team
+
+---
+You're receiving this email because you subscribed to promotional offers.
+To unsubscribe, please update your profile settings.
+        """
+        
+        for user in subscribed_users:
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+                emails_sent += 1
+                logger.info(f"Promotion email sent to {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send email to {user.email}: {e}")
+                continue
+        
+        logger.info(f"Promotion emails sent: {emails_sent} out of {subscribed_users.count()} subscribed users")
+        
+        return emails_sent
+    
+class AdminPromotionDetailView(APIView):
+    """
+    Get, update, or delete a specific promotion
+    
+    GET /api/admin/promotions/<id>/
+    PUT /api/admin/promotions/<id>/
+    DELETE /api/admin/promotions/<id>/
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def get(self, request, pk):
+        """Get promotion details"""
+        try:
+            promotion = Promotion.objects.get(pk=pk)
+            serializer = PromotionSerializer(promotion)
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Promotion.DoesNotExist:
+            return Response(
+                {"error": "Promotion not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving promotion: {e}")
+            return Response(
+                {"error": "Failed to retrieve promotion"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def put(self, request, pk):
+        """Update promotion"""
+        try:
+            promotion = Promotion.objects.get(pk=pk)
+            
+            # Remove send_email flag if present (not for updates)
+            request.data.pop('send_email', None)
+            
+            serializer = PromotionSerializer(promotion, data=request.data, partial=True)
+            
+            if serializer.is_valid():
+                updated_promotion = serializer.save()
+                
+                logger.info(
+                    f"Promotion updated: {updated_promotion.promo_code} "
+                    f"by admin {request.user.username}"
+                )
+                
+                return Response({
+                    'message': 'Promotion updated successfully',
+                    'promotion': PromotionSerializer(updated_promotion).data
+                }, status=status.HTTP_200_OK)
+            
+            return Response({
+                'error': 'Validation failed',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Promotion.DoesNotExist:
+            return Response(
+                {"error": "Promotion not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error updating promotion: {e}")
+            return Response(
+                {"error": f"Failed to update promotion: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def delete(self, request, pk):
+        """Delete promotion"""
+        try:
+            promotion = Promotion.objects.get(pk=pk)
+            promo_code = promotion.promo_code
+            
+            promotion.delete()
+            
+            logger.info(f"Promotion deleted: {promo_code} by admin {request.user.username}")
+            
+            return Response({
+                'message': f'Promotion "{promo_code}" deleted successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Promotion.DoesNotExist:
+            return Response(
+                {"error": "Promotion not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error deleting promotion: {e}")
+            return Response(
+                {"error": "Failed to delete promotion"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class AdminPromotionEmailView(APIView):
+    """
+    Send existing promotion to subscribed users
+    
+    POST /api/admin/promotions/<id>/send-email/
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def post(self, request, pk):
+        """Send promotion email to subscribed users"""
+        try:
+            promotion = Promotion.objects.get(pk=pk)
+            
+            # Get subscribed users
+            subscribed_users = User.objects.filter(
+                profile__subscribed=True,
+                is_active=True
+            ).exclude(email='')
+            
+            if subscribed_users.count() == 0:
+                return Response({
+                    'message': 'No subscribed users to send email to',
+                    'emails_sent': 0
+                }, status=status.HTTP_200_OK)
+            
+            # Send emails
+            emails_sent = 0
+            subject = f"🎉 Special Offer: {promotion.discount}% Off!"
+            message = f"""
+Hello!
+
+We have an exciting promotion for you!
+
+Promo Code: {promotion.promo_code}
+Discount: {promotion.discount}% OFF
+Valid From: {promotion.start_date.strftime('%B %d, %Y')}
+Valid Until: {promotion.end_date.strftime('%B %d, %Y')}
+
+Use code "{promotion.promo_code}" at checkout to get {promotion.discount}% off your ticket purchase!
+
+Don't miss out on this limited-time offer!
+
+Best regards,
+Cinema E-Booking Team
+
+---
+You're receiving this email because you subscribed to promotional offers.
+To unsubscribe, please update your profile settings.
+            """
+            
+            for user in subscribed_users:
+                try:
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        fail_silently=False,
+                    )
+                    emails_sent += 1
+                except Exception as e:
+                    logger.error(f"Failed to send email to {user.email}: {e}")
+                    continue
+            
+            logger.info(
+                f"Promotion {promotion.promo_code} emailed to {emails_sent} users "
+                f"by admin {request.user.username}"
+            )
+            
+            return Response({
+                'message': f'Promotion email sent to {emails_sent} subscribed users',
+                'emails_sent': emails_sent,
+                'total_subscribed': subscribed_users.count()
+            }, status=status.HTTP_200_OK)
+            
+        except Promotion.DoesNotExist:
+            return Response(
+                {"error": "Promotion not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error sending promotion emails: {e}")
+            return Response(
+                {"error": f"Failed to send emails: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 # ADD SHOWROOM MANAGEMENT  
 class AdminShowroomListView(APIView):

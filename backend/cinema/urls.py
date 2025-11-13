@@ -37,16 +37,12 @@ urlpatterns = [
     # Admin Genre List (for dropdown in add movie form)
     path('api/admin/genres/', views_admin.AdminGenreListView.as_view(), name='admin-genres'),
     
-    # Admin Promotions
-    path('api/admin/promotions/', views_admin.AdminPromotionView.as_view(), name='admin-add-promotion'),       # POST to add
-    path('api/admin/promotions/<int:pk>/', views_admin.AdminPromotionView.as_view(), name='admin-remove-promotion'),  # DELETE to remove
+    # Admin Promotion Management
+    path('api/admin/promotions/', views_admin.AdminPromotionListView.as_view(), name='admin-promotions-list'),
+    path('api/admin/promotions/create/', views_admin.AdminPromotionCreateView.as_view(), name='admin-promotions-create'),
+    path('api/admin/promotions/<int:pk>/', views_admin.AdminPromotionDetailView.as_view(), name='admin-promotions-detail'),
+    path('api/admin/promotions/<int:pk>/send-email/', views_admin.AdminPromotionEmailView.as_view(), name='admin-promotions-email'),
     
-    # Admin User Management (placeholder)
-    #path('api/admin/users/', views_admin.AdminUserManagementView.as_view(), name='admin-users'),
-    
-    # Admin Showtime Management (placeholder)
-    #path('api/admin/showtimes/', views_admin.AdminShowtimeManagementView.as_view(), name='admin-showtimes'),
-
     # Admin Showroom Management
     path('api/admin/showrooms/', views_admin.AdminShowroomListView.as_view(), name='admin-showrooms'),
     

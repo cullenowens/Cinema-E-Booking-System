@@ -107,7 +107,7 @@ class Promotion(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+    #is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'cinema_promotions'
