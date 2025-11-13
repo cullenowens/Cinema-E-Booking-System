@@ -133,7 +133,7 @@ urlpatterns += [
 
     # User Details - GET /api/auth/user-details/
     # Retrieve basic user details
-    path('api/auth/user-details/', views_auth.UserDetailView.as_view(), name='user_details'),
+    #path('api/auth/user-details/', views_auth.UserDetailView.as_view(), name='user_details'),
 ]
 
 #Help:
