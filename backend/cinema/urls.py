@@ -42,7 +42,7 @@ urlpatterns = [
     path('api/admin/promotions/create/', views_admin.AdminPromotionCreateView.as_view(), name='admin-promotions-create'),
     path('api/admin/promotions/<int:pk>/', views_admin.AdminPromotionDetailView.as_view(), name='admin-promotions-detail'),
     path('api/admin/promotions/<int:pk>/send-email/', views_admin.AdminPromotionEmailView.as_view(), name='admin-promotions-email'),
-    
+
     # Admin Showroom Management
     path('api/admin/showrooms/', views_admin.AdminShowroomListView.as_view(), name='admin-showrooms'),
     
@@ -170,3 +170,6 @@ urlpatterns += [
 # GET    /api/admin/showings/availability/     → Check availability
 # 
 # Promotions:
+# GET    /api/admin/promotions/                → List all promotions
+# POST   /api/admin/promotions/                → Add new promotion
+# DELETE /api/admin/promotions/1/              → Delete promotion with ID 1
