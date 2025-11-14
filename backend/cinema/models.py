@@ -60,8 +60,15 @@ class MovieShowtime(models.Model):
         return f"{self.movie.movie_title} - {self.showtime_value}"
     
 class Showroom(models.Model):
-    """Model for movie showrooms/theaters"""
+    """
+    Model for movie showrooms/theaters
+    Example:
+    - Theater 1: 100 seats (Rows A-J, Seats 1-10)
+    - Theater 2: 150 seats (Rows A-O, Seats 1-10)
+    - Imax: 200 seats (Rows A-T, Seats 1-10)
+    """
     showroom_id = models.AutoField(primary_key=True)
+
     showroom_name = models.CharField(max_length=50)
 
     class Meta:
@@ -71,12 +78,66 @@ class Showroom(models.Model):
     def __str__(self):
         return self.showroom_name
 
+class Seat(models.Model):
+    """
+    Represents individual seats in a showroom
+
+    Example seats in Theater 1:
+    - seat_id: 1, showroom_id: 1, row_label = 'A', seat_number = 1
+    - seat_id: 2, showroom_id: 1, row_label = 'A', seat_number = 2
+    - seat_id: 3, showroom_id: 1, row_label = 'A', seat_number = 3
+
+    Table used to track seat availability for showings, show seat map, and prevent double bookings
+    """
+    seat_id = models.AutoField(primary_key=True)
+
+    showroom_id = models.ForeignKey(
+
+        Showroom,
+        # crucial to note that if showroom is deleted, all its seats are deleted too
+        # seats are meaningless without a showroom
+        on_delete=models.CASCADE,
+        db_column='showroom_id',
+        # added so we can access seats from showroom instance (Access via showroom.seats.all())
+        related_name='seats'
+    )
+
+    row_label = models.CharField(max_length=1)
+    seat_number = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = 'seats'
+        managed = False
+        # ensure unique seat per showroom
+        unique_together = ('showroom_id', 'row_label', 'seat_number')
+        # adding so seats return sorted by row and number (A1, A2, A3...B1, B2, B3...)
+        ordering = ['row_label', 'seat_number']
+        
+    def __str__(self):
+        return f"{self.row_label}{self.seat_number}"
+
 
 class Showing(models.Model):
     """Model for movie showings (scheduled screenings)"""
     showing_id = models.AutoField(primary_key=True)
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
-    showroom = models.ForeignKey(Showroom, on_delete=models.CASCADE, db_column='showroom_id')
+
+    movie = models.ForeignKey(
+        Movie,
+        # delete showings if movie is deleted
+        on_delete=models.CASCADE,
+        db_column='movie_id',
+        # added so we can access showings from movie instance (Access via movie.showings.all())
+        related_name='showings'
+    )
+    
+    showroom = models.ForeignKey(
+        Showroom,
+        on_delete=models.CASCADE,
+        db_column='showroom_id',
+        # added so we can access showings from showroom instance (Access via showroom.showings.all())
+        related_name='showings'
+    )
+
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)
 
@@ -84,11 +145,83 @@ class Showing(models.Model):
         db_table = 'showings'
         managed = False
         unique_together = ('showroom', 'start_time')
+        # add ordering by start time
+        ordering = ['start_time']
 
     def __str__(self):
-        return f"{self.movie.movie_title} - {self.showroom.showroom_name} - {self.start_time}"
-    
+        return f"{self.movie.movie_title} - {self.showroom.showroom_name} - {self.start_time.strftime('%b %d, %I:%M %p')}"    
 
+
+class Booking(models.Model):
+    """
+    Represents a user's booking for a specific showing
+    """
+    booking_id = models.AutoField(primary_key=True)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        db_column='user_id',
+        # added so we can access bookings from user instance (Access via user.bookings.all())
+        related_name='bookings'
+    )
+
+    class Meta:
+        db_table = 'bookings'
+        managed = False
+
+    def __str__(self):
+        return f"Booking #{self.booking_id} by {self.user.username}"
+    
+class Ticket(models.Model):
+    """
+    Represents one ticket within a booking
+    """
+
+    AGE_CATEGORIES = [
+        ('Child', 'Child'),
+        ('Adult', 'Adult'),
+        ('Senior', 'Senior'),
+    ]
+
+    # each ticket is linked to a booking
+    ticket_id = models.AutoField(primary_key=True)
+
+    booking = models.ForeignKey(
+        Booking,
+        on_delete=models.CASCADE,
+        db_column='booking_id',
+        # added so we can access tickets from booking instance (Access via booking.tickets.all())
+        related_name='tickets'
+    )
+
+    showing = models.ForeignKey(
+        Showing,
+        on_delete=models.CASCADE,
+        db_column='showing_id',
+        # added so we can access tickets from showing instance (Access via showing.tickets.all())
+        related_name='tickets'
+    )
+
+    seat = models.ForeignKey(
+        Seat,
+        on_delete=models.CASCADE,
+        db_column='seat_id',
+        related_name='tickets'
+    )
+    
+    age_category = models.CharField(
+        max_length=10,
+        choices=AGE_CATEGORIES
+    )
+
+    class Meta:
+        db_table = 'tickets'
+        managed = False
+
+    def __str__(self):
+        return f"Ticket #{self.ticket_id} - Seat {self.seat} - {self.age_category}"
+    
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
     phone = models.CharField(max_length=20, blank=True)
