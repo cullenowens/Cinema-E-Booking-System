@@ -5,7 +5,10 @@ from django.contrib.auth.models import User
 from datetime import timedelta
 from django.utils import timezone
 from django.db import models
-from .models import Profile, Movie, Promotion, PaymentCard, Address, Genre, MovieGenre, Showing, Showroom
+from .models import (
+    Profile, Movie, Promotion, PaymentCard, Address, Genre, MovieGenre, 
+    Showing, Showroom, Seat, Booking, Ticket
+)
 
 # --- Movie Serializer ---
 # Handles Movie model serialization (for display or creation)
@@ -616,3 +619,478 @@ class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = ["username", "email", "first_name", "last_name", "phone_number", "subscribed", "status"]
+
+
+# --- User Portal Serializers ---
+
+class SeatSerializer(serializers.ModelSerializer):
+    """
+    Basic seat serializer for displaying seat info.
+
+    Purpose is to show seat details in API responses (used for admin, generic lists)
+
+    Example output:
+    {
+        "seat_id": 1,
+        "row_label": "A",
+        "seat_number": 1,
+        "seat_display": "A1"
+    }
+    """
+    seat_display = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Seat
+        fields = ['seat_id', 'row_label', 'seat_number', 'seat_display']
+        read_only_fields = ['seat_id']
+
+    def get_seat_display(self, obj):
+        """Display seat as 'A1', 'B5', etc."""
+        return f"{obj.row_label}{obj.seat_number}"
+    
+
+class SeatAvailabilitySerializer(serializers.ModelSerializer):
+    """
+    Seat serializer WITH availability status for a specific showing.
+    shows which seats are available vs. booked for seating selection.
+
+    Example output:
+    {
+        "seat_id": 1,
+        "row_label": "A",
+        "seat_number": 1,
+        "seat_display": "A1",
+        "is_available": true,
+        "ticket_type": null
+    }
+
+    Key feature = is_available dynamically checks if seat is booked for specific showing.
+    """
+    # variables to hold showing context
+    seat_display = serializers.SerializerMethodField(read_only=True)
+    is_available = serializers.SerializerMethodField(read_only=True)
+    ticket_type = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Seat
+        fields = [
+            'seat_id',
+            'row_label',
+            'seat_number',
+            'seat_display',
+            'is_available',
+            'ticket_type'
+        ]
+        read_only_fields = ['seat_id']
+
+    def get_seat_display(self, obj):
+        '''Display seat as 'A1', 'B5', etc.'''
+        return f"{obj.row_label}{obj.seat_number}"
+    
+    # method to check if seat is available for the given showing
+    def get_is_available(self, obj):
+        '''
+        Check if seat is available for the given showing.
+
+        requires showing_id in context from view.
+        serializer = SeatAvailabilitySerializer(seats, many=True, context={'showing_id': 42})
+        '''
+        showing_id = self.context.get('showing_id')
+
+        if not showing_id:
+            # if no showing_id provided, assume the seat is available
+            return True
+
+        # check if a ticket exists for this seat + showing combo
+        return not Ticket.objects.filter(
+            showing_id=showing_id,
+            seat=obj
+        ).exists()
+    
+    # method to check ticket type if seat is booked
+    def get_ticket_type(self, obj):
+        '''
+        if the seat is booked, return the ticket type (Adult, Child, Senior).
+        if available, return None.
+        '''
+        showing_id = self.context.get('showing_id')
+
+        if not showing_id:
+            return None
+        
+        try:
+            ticket = Ticket.objects.get(
+                showing_id=showing_id,
+                seat=obj
+            )
+            return ticket.age_category
+        except Ticket.DoesNotExist:
+            return None
+        
+
+class ShowingDetailSerializer(serializers.ModelSerializer):
+    '''
+    Detailed showing serializer for User portal (includes availability).
+
+    shows complete showing info + seat availability for user booking
+    different from the ShowingSerializer used for admin scheduling and operations.
+
+    Example output:
+    {
+        "showing_id": 42,
+        "movie_id": 5,
+        "movie_title": "Inception",
+        "movie_poster": "https://...",
+        "showroom_id": 1,
+        "showroom_name": "Theater 1",
+        "start_time": "2025-11-15T19:30:00Z",
+        "end_time": "2025-11-15T22:00:00Z",
+        "available_seats": 95,
+        "total_seats": 100
+    }
+    '''
+    # variables for detailed display
+    movie_title = serializers.CharField(source='movie.movie_title', read_only=True)
+    movie_poster = serializers.CharField(source='movie.poster_url', read_only=True)
+    showroom_name = serializers.CharField(source='showroom.showroom_name', read_only=True)
+    available_seats = serializers.SerializerMethodField(read_only=True)
+    total_seats = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Showing
+        fields = [
+            'showing_id',
+            'movie_id',
+            'movie_title',
+            'movie_poster',
+            'showroom_id',
+            'showroom_name',
+            'start_time',
+            'end_time',
+            'available_seats',
+            'total_seats'
+        ]
+        read_only_fields = ['showing_id']
+
+    def get_total_seats(self, obj):
+        '''Count total seats in the showroom'''
+        return obj.showroom.seats.count()
+        
+    def get_available_seats(self, obj):
+        '''calculates the available seats for this showing'''
+        total_seats = obj.showroom.seats.count()
+        booked_seats = Ticket.objects.filter(showing=obj).count()
+        return total_seats - booked_seats
+        
+
+class SeatMapSerializer(serializers.Serializer):
+    '''
+    Serializer for complete seat map with availability for a showing.
+
+    generates the entire seat layout for showing's booking page.
+
+    Example output:
+    {
+        "showing": {
+            "showing_id": 42,
+            "movie_title": "Inception",
+            ...
+        },
+        "seats_by_row": {
+            "A": [
+                {"seat_id": 1, "seat_number": 1, "is_available": true},
+                {"seat_id": 2, "seat_number": 2, "is_available": false},
+                ...
+            ],
+            "B": [...],
+            ...
+        },
+        "total_seats": 100,
+        "available_seats": 95
+    }
+    '''
+
+    showing = ShowingDetailSerializer(read_only=True)
+    seats_by_row = serializers.SerializerMethodField(read_only=True)
+    total_seats = serializers.IntegerField(read_only=True)
+    available_seats = serializers.IntegerField(read_only=True)
+
+    def get_seats_by_row(self, obj):
+        '''
+        Group seats by row for frontend display.
+        Returns: {"A": [seats], "B": [seats], ...}
+        '''
+        from collections import defaultdict
+
+        showing = obj['showing']
+        seats = obj['seats']
+
+        # groups seats by row
+        seats_by_row = defaultdict(list)
+
+        for seat in seats:
+            seat_data = SeatAvailabilitySerializer(
+                seat,
+                context={'showing_id': showing.showing_id}
+            ).data
+            seats_by_row[seat.row_label].append(seat_data)
+        
+        # convert to regular dict and sort rows alphabetically
+        return dict(sorted(seats_by_row.items()))
+    
+
+class TicketSerializer(serializers.ModelSerializer):
+    '''
+    Serializer for individual tickets.
+
+    purpose is to display ticket details in bookings.
+
+    Example output:
+    {
+        "ticket_id": 456,
+        "seat_id": 5,
+        "seat_display": "A5",
+        "age_category": "Adult",
+        "price": 12.00
+    }
+    '''
+    seat_display = serializers.CharField(source='seat.__str__', read_only=True)
+    price = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Ticket
+        fields = [
+            'ticket_id',
+            'seat_id',
+            'seat_display',
+            'age_category',
+            'price'
+        ]
+        read_only_fields = ['ticket_id']
+
+    def get_price(self, obj):
+        '''
+        calculate ticket price based on age category.
+
+        Pricing:
+        - Child: $8.00
+        - Adult: $12.00
+        - Senior: $10.00
+        '''
+        pricing = {
+            'Child': 8.00,
+            'Adult': 12.00,
+            'Senior': 10.00
+        }
+        # default to Adult price if category not found
+        return pricing.get(obj.age_category, 12.00)
+    
+class BookingCreateSerializer(serializers.Serializer):
+    '''
+    Serializer for creating a new booking (checkout process).
+    
+    purpose is to handle user's seat selection and create booking + tickets.
+
+    example input:
+    {
+        "showing_id": 42, 
+        "seats": [
+            {"seat_id": 5, "age_category": "Adult"},
+            {"seat_id": 6, "age_category": "Child"},
+            {"seat_id": 7, "age_category": "Senior"}
+        ]
+    }
+
+    validation:
+    - showing exists and is in future
+    - all seats exist and are available
+    - no duplicate seat selections
+
+    creates:
+    - 1 Booking record
+    - multiple Ticket records (one per seat)
+    '''
+
+    showing_id = serializers.IntegerField(required=True)
+    seats = serializers.ListField(
+        child=serializers.DictField(),
+        min_length=1,
+        max_length=10,
+        required=True
+    )
+
+    def validate_showing_id(self, value):
+        """Validate showing exists and is in the future."""
+        try:
+            showing = Showing.objects.get(showing_id=value)
+            
+            if showing.start_time < timezone.now():
+                raise serializers.ValidationError(
+                    "Cannot book tickets for past showings"
+                )
+            
+            return value
+        except Showing.DoesNotExist:
+            raise serializers.ValidationError(
+                f"Showing with ID {value} does not exist"
+            )
+        
+    def validate_seats(self, value):
+        """Validate seat selection."""
+        if not value:
+            raise serializers.ValidationError("At least one seat must be selected")
+        
+        for seat_data in value:
+            if 'seat_id' not in seat_data:
+                raise serializers.ValidationError("Each seat must have seat_id")
+            
+            if 'age_category' not in seat_data:
+                raise serializers.ValidationError("Each seat must have age_category")
+            
+            try:
+                Seat.objects.get(seat_id=seat_data['seat_id'])
+            except Seat.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Seat with ID {seat_data['seat_id']} does not exist"
+                )
+            
+            valid_categories = ['Child', 'Adult', 'Senior']
+            if seat_data['age_category'] not in valid_categories:
+                raise serializers.ValidationError(
+                    f"Age category must be one of: {', '.join(valid_categories)}"
+                )
+        
+        return value
+    
+    def validate(self, data):
+        """Cross-field validation: check availability and correct showroom."""
+        showing_id = data['showing_id']
+        seats_data = data['seats']
+
+        showing = Showing.objects.get(showing_id=showing_id)
+        seat_ids = [s['seat_id'] for s in seats_data]
+
+        # Check for duplicate seat selections
+        if len(seat_ids) != len(set(seat_ids)):
+            raise serializers.ValidationError({
+                "seats": "Cannot select the same seat multiple times"
+            })
+        
+        # Validate each seat
+        for seat_data in seats_data:
+            seat = Seat.objects.get(seat_id=seat_data['seat_id'])
+            
+            # Check correct showroom
+            if seat.showroom_id != showing.showroom:
+                raise serializers.ValidationError({
+                    "seats": f"Seat {seat} is not in {showing.showroom.showroom_name}"
+                })
+            
+            # Check availability
+            if Ticket.objects.filter(showing=showing, seat=seat).exists():
+                raise serializers.ValidationError({
+                    "seats": f"Seat {seat} is already booked for this showing"
+                })
+        
+        return data
+    
+    def create(self, validated_data):
+        """
+        Create booking with tickets.
+
+        Process:
+        1. Create Booking
+        2. Create Ticket for each seat
+        3. Return booking with tickets
+        """
+        showing_id = validated_data['showing_id']
+        seats_data = validated_data['seats']
+        user = self.context['request'].user
+        
+        showing = Showing.objects.get(showing_id=showing_id)
+
+        # Create booking
+        booking = Booking.objects.create(user=user)
+        
+        # Create tickets
+        tickets = []
+        for seat_data in seats_data:
+            seat = Seat.objects.get(seat_id=seat_data['seat_id'])
+            
+            ticket = Ticket.objects.create(
+                booking=booking,
+                showing=showing,
+                seat=seat,
+                age_category=seat_data['age_category']
+            )
+            tickets.append(ticket)
+        
+        return {
+            'booking': booking,
+            'tickets': tickets
+        }
+    
+class BookingDetailSerializer(serializers.ModelSerializer):
+    """
+    Detailed serializer for viewing booking history.
+    
+    Purpose: Show user their bookings with full details.
+    
+    Example output:
+    {
+        "booking_id": 123,
+        "user_email": "john@email.com",
+        "movie_title": "Inception",
+        "showroom_name": "Theater 1",
+        "start_time": "2025-11-15T19:30:00Z",
+        "tickets": [
+            {"seat_display": "A5", "age_category": "Adult", "price": 12.00},
+            {"seat_display": "A6", "age_category": "Child", "price": 8.00}
+        ],
+        "total_price": 20.00
+    }
+    """
+
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    movie_title = serializers.CharField(
+        source='tickets.first.showing.movie.movie_title',
+        read_only=True
+    )
+    showroom_name = serializers.CharField(
+        source='tickets.first.showing.showroom.showroom_name',
+        read_only=True
+    )
+    start_time = serializers.DateTimeField(
+        source='tickets.first.showing.start_time',
+        read_only=True
+    )
+    tickets = TicketSerializer(many=True, read_only=True)
+    total_price = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Booking
+        fields = [
+            'booking_id',
+            'user_email',
+            'movie_title',
+            'showroom_name',
+            'start_time',
+            'tickets',
+            'total_price'
+        ]
+        read_only_fields = ['booking_id']
+    
+    def get_total_price(self, obj):
+        """Calculate total price for all tickets."""
+        pricing = {
+            'Child': 8.00,
+            'Adult': 12.00,
+            'Senior': 10.00
+        }
+        
+        total = sum(
+            pricing.get(ticket.age_category, 12.00)
+            for ticket in obj.tickets.all()
+        )
+        
+        return total

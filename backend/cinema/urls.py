@@ -132,6 +132,36 @@ urlpatterns += [
     #path('api/auth/user-details/', views_auth.UserDetailView.as_view(), name='user_details'),
 ]
 
+# USER PORTAL ENDPOINTS SUMMARY
+from .views_user import (
+    ShowingListView,
+    ShowingDetailView,
+    SeatMapView,
+    SeatAvailabilityView,
+    BookingCreateView,
+    BookingListView,
+    BookingDetailView,
+    MovieShowingsView,
+)
+
+urlpatterns += [
+    # Browse Showings - Public access
+    path('api/user/showings/', ShowingListView.as_view(), name='user-showing-list'),
+    path('api/user/showings/<int:pk>/', ShowingDetailView.as_view(), name='user-showing-detail'),
+
+    # Seat Selection - Public access (can view before login)
+    path('api/user/showings/<int:pk>/seats/', SeatMapView.as_view(), name='seat-map'),
+    path('api/user/showings/<int:pk>/check-seats/', SeatAvailabilityView.as_view(), name='check-seats'),
+
+    # Bookings - Requires authentication
+    path('api/user/bookings/', BookingListView.as_view(), name='user-booking-list'),
+    path('api/user/bookings/create/', BookingCreateView.as_view(), name='booking-create'),
+    path('api/user/bookings/<int:pk>/', BookingDetailView.as_view(), name='user-booking-detail'),
+
+    # Browse by Movie - Public access
+    path('api/user/movies/<int:movie_id>/showings/', MovieShowingsView.as_view(), name='movie-showings'),
+]
+
 #Help:
 # Example Frontend Usage:
 # fetch('/api/movies/')                    → get_all_movies()
