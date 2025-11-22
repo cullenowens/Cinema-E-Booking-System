@@ -46,14 +46,14 @@ export const AuthProvider = ({ children }) => {
         username,
         email,
         password,
-        phone,
+        phone_number: phone,
         subscribed,
       });
       return { success: true };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.error || "Registration failed",
+        error: JSON.stringify(error.response?.data) || "Registration failed",
       };
     }
   };

@@ -8,6 +8,8 @@ const Navbar = () => {
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
 
+  const isAdmin = true;
+
   const { user } = useAuth();
 
   console.log(user);
@@ -46,6 +48,14 @@ const Navbar = () => {
                 className="text-gray-500 bg-white rounded-xl pl-2 w-70 pr-2 text-left focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-transparent"
               />
             </form>
+            {isAdmin && (
+              <button
+                onClick={() => navigate("/admin")}
+                className="text-white cursor-pointer hover:bg-gray-800 transition-colors p-1"
+              >
+                Admin Portal
+              </button>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
