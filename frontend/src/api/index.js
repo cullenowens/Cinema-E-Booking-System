@@ -119,3 +119,138 @@ export const updatePassword = async (data) => {
 
   return response.data;
 };
+
+export const getAllMovies = async () => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.get(`${url}/admin/movies/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const createMovie = async (movieData) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.post(`${url}/admin/movies/create/`, movieData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const updateMovie = async (movieId, movieData) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.put(`${url}/admin/movies/${movieId}/`, movieData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const deleteMovie = async (movieId) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.delete(`${url}/admin/movies/${movieId}/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const getGenres = async () => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.get(`${url}/admin/genres/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const getAdminShowings = async () => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.get(`${url}/admin/showings/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const getAdminShowrooms = async () => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.get(`${url}/admin/showrooms/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const createShowing = async (showingData) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.post(`${url}/admin/showings/create/`, showingData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const updateShowing = async (id, showingData) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.put(`${url}/admin/showings/${id}/`, showingData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const deleteShowing = async (id) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.delete(`${url}/admin/showings/${id}/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const checkShowingAvailability = async (
+  showroom_id,
+  start_time,
+  end_time
+) => {
+  const token = localStorage.getItem("accessToken");
+  const params = {
+    showroom_id,
+    start_time,
+  };
+  if (end_time) params.end_time = end_time;
+
+  const res = await axios.get(`${url}/admin/showings/availability/`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: params,
+  });
+  return res.data;
+};
+
+export const getPromotions = async () => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.get(`${url}/admin/promotions/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const createPromotion = async (promoData) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.post(`${url}/admin/promotions/create/`, promoData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const deletePromotion = async (id) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.delete(`${url}/admin/promotions/${id}/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const sendPromotionEmail = async (id) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.post(
+    `${url}/admin/promotions/${id}/send-email/`,
+    {},
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return res.data;
+};

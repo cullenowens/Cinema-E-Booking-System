@@ -10,6 +10,11 @@ import VerifyPage from "./pages/VerifyPage/VerifyPage";
 import ProfilePage from "./pages/ProfilePage/ProfilePage";
 import PaymentPage from "./pages/PaymentPage/PaymentPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage/ForgotPasswordPage";
+import AdminPage from "./pages/AdminPage/AdminPage";
+import ManageMoviesPage from "./pages/ManageMoviesPage/ManageMoviesPage";
+import ManageShowtimesPage from "./pages/ManageShowtimesPage/ManageShowtimesPage";
+import ManagePromotionsPage from "./pages/ManagePromotionsPage/ManagePromotionsPage";
+import ManageUsersPage from "./pages/ManageUsersPage/ManageUsersPage";
 
 function App() {
   return (
@@ -26,6 +31,18 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/payment-methods" element={<PaymentPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/manage-movies" element={<ManageMoviesPage />} />
+          <Route
+            path="/admin/manage-promotions"
+            element={<ManagePromotionsPage />}
+          />
+          <Route path="/admin/manage-users" element={<ManageUsersPage />} />
+
+          <Route
+            path="/admin/manage-showtimes"
+            element={<ManageShowtimesPage />}
+          />
         </Routes>
       </Router>
     </AuthProvider>
