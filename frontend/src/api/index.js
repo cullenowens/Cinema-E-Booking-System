@@ -254,3 +254,13 @@ export const sendPromotionEmail = async (id) => {
   );
   return res.data;
 };
+
+export const getUserMovieShowings = async (movieId) => {
+  const res = await axios.get(`${url}/user/movies/${movieId}/showings/`);
+  return res.data;
+};
+
+export const getShowingSeats = async (showingId) => {
+  const res = await axios.get(`${url}/user/showings/${showingId}/seats/`);
+  return res.data;
+};
