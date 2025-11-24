@@ -476,7 +476,7 @@ class ProfileSerializer(serializers.ModelSerializer):
      #update user and profile fields
     class Meta:
         model = Profile
-        fields = ["username", "email", "first_name", "last_name", "phone", "subscribed", "status"]
+        fields = ["username", "email", "first_name", "last_name", "phone_number", "subscribed", "status"]
 
     def update(self, instance, validated_data):
         #update user fields
