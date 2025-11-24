@@ -53,3 +53,4 @@ build/
 
 # Test files (optional - you might want to keep these)
 test_api.http
+backend/cinema/migrations/0004_booking_seat_showing_showroom_ticket_and_more.py
