@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getMovieDetails, getUserMovieShowings } from "../../api/index";
 import Navbar from "../../components/Navbar/Navbar";
+import { useAuth } from "../../contexts/AuthContext"; // Import useAuth
 
 const MoviePage = () => {
   const { id } = useParams();
@@ -9,6 +10,7 @@ const MoviePage = () => {
   const [showings, setShowings] = useState([]);
 
   const navigate = useNavigate();
+  const { user } = useAuth(); // Use the hook to get user state
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,6 +35,12 @@ const MoviePage = () => {
   }, [id]);
 
   const handleShowtimeClick = (showing) => {
+    // Check if the user is signed in. If not, redirect to the sign-in page.
+    if (!user) {
+      navigate("/signin");
+      return;
+    }
+
     // Navigate to booking page.
     // Currently using start_time string as the 'showtime' parameter to match existing routing.
     // In a full implementation, this would ideally pass showing.showing_id.
