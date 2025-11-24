@@ -8,9 +8,9 @@ const Navbar = () => {
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
 
-  const isAdmin = true;
-
   const { user } = useAuth();
+
+  const isAdmin = user && user.is_staff;
 
   console.log(user);
   useEffect(() => {
@@ -48,6 +48,7 @@ const Navbar = () => {
                 className="text-gray-500 bg-white rounded-xl pl-2 w-70 pr-2 text-left focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-transparent"
               />
             </form>
+            {/* Show Admin Portal button only if isAdmin is true */}
             {isAdmin && (
               <button
                 onClick={() => navigate("/admin")}
