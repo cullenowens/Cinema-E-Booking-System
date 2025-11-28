@@ -224,7 +224,7 @@ class Ticket(models.Model):
     
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
-    phone = models.CharField(max_length=20, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
     subscribed = models.BooleanField(default=False)         # promotions
     status = models.CharField(max_length=10, default="Inactive")  # Active/Inactive
     verification_code = models.CharField(max_length=6, null=True, blank=True)
