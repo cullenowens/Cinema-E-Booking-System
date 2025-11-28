@@ -421,7 +421,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         #create user (in auth_user table)
         user = User.objects.create_user(**validated_data)
         #create associated profile (in cinema_profile table)
-        Profile.objects.create(user=user, phone_number=phone_number, subscribed=subscribed, status="Inactive")
+        Profile.objects.create(user=user, phone=phone_number, subscribed=subscribed, status="Inactive")
         #creates empty address for the user
         Address.objects.create(
             user=user,
