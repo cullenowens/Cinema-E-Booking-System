@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from datetime import timedelta
 from django.utils import timezone
 from django.db import models
+import logging
 from .models import (
     Profile, Movie, Promotion, PaymentCard, Address, Genre, MovieGenre, 
     Showing, Showroom, Seat, Booking, Ticket
@@ -303,87 +304,90 @@ class ShowingSerializer(serializers.ModelSerializer):
         return instance
 
 # --- Promotion Serializer ---
-# Serializes promotions and their discount details
+# handles promotion data with discount_type and discount_value fields
 
 class PromotionSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Promotion with comprehensive validation
-    """
+    """serializer for promotions using discount_type and discount_value"""
     class Meta:
         model = Promotion
-        fields = ['promo_id', 'discount', 'promo_code', 'start_date', 'end_date', 'created_at']
+        fields = ['promo_id', 'promo_code', 'discount_type', 'discount_value', 'start_date', 'end_date', 'created_at']
         read_only_fields = ['promo_id', 'created_at']
 
     def validate_promo_code(self, value):
-        """Validate promo code is unique and properly formatted"""
+        """make sure promo code is unique and formatted correctly"""
         if not value or value.strip() == "":
-            raise serializers.ValidationError("Promo code cannot be empty")
+            raise serializers.ValidationError("promo code cannot be empty")
         
-        # Convert to uppercase and remove extra spaces
         value = value.strip().upper()
         
-        # Check for minimum length
         if len(value) < 3:
-            raise serializers.ValidationError("Promo code must be at least 3 characters")
+            raise serializers.ValidationError("promo code must be at least 3 characters")
         
-        # Check for valid characters (letters, numbers, hyphens, underscores)
         import re
         if not re.match(r'^[A-Z0-9_-]+$', value):
-            raise serializers.ValidationError(
-                "Promo code can only contain letters, numbers, hyphens, and underscores"
-            )
+            raise serializers.ValidationError("promo code can only contain letters, numbers, hyphens, and underscores")
         
-        # Check for uniqueness (case-insensitive)
         if Promotion.objects.filter(promo_code__iexact=value).exists():
-            # If updating, allow same promo code for same promotion
             if self.instance and self.instance.promo_code.upper() == value:
                 return value
-            raise serializers.ValidationError("A promotion with this code already exists")
+            raise serializers.ValidationError("a promotion with this code already exists")
         
         return value
     
-    def validate_discount(self, value):
-        """Validate discount is within valid range"""
+    def validate_discount_type(self, value):
+        """check discount type is either percentage or fixed"""
+        if not value:
+            raise serializers.ValidationError("discount type is required")
+        
+        valid_types = ['percentage', 'fixed']
+        if value.lower() not in valid_types:
+            raise serializers.ValidationError(f"discount type must be one of: {', '.join(valid_types)}")
+        
+        return value.lower()
+    
+    def validate_discount_value(self, value):
+        """make sure discount value is positive"""
         if value is None:
-            raise serializers.ValidationError("Discount is required")
+            raise serializers.ValidationError("discount value is required")
         
         if value <= 0:
-            raise serializers.ValidationError("Discount must be greater than 0")
-        
-        if value > 100:
-            raise serializers.ValidationError("Discount cannot exceed 100%")
+            raise serializers.ValidationError("discount value must be greater than 0")
         
         return value
     
     def validate_start_date(self, value):
-        """Validate start date"""
+        """check start date is today or future"""
         if not value:
-            raise serializers.ValidationError("Start date is required")
+            raise serializers.ValidationError("start date is required")
         
         from datetime import date
-        # Allow promotions to start today or in the future
         if value < date.today():
-            raise serializers.ValidationError("Start date cannot be in the past")
+            raise serializers.ValidationError("start date cannot be in the past")
         
         return value
     
     def validate_end_date(self, value):
-        """Validate end date"""
+        """check end date exists"""
         if not value:
-            raise serializers.ValidationError("End date is required")
+            raise serializers.ValidationError("end date is required")
         
         return value
     
     def validate(self, data):
-        """Validate that end date is after start date"""
+        """cross-field validation for discount type and dates"""
+        discount_type = data.get('discount_type')
+        discount_value = data.get('discount_value')
         start_date = data.get('start_date')
         end_date = data.get('end_date')
         
+        # percentage discounts cant exceed 100%
+        if discount_type == 'percentage' and discount_value > 100:
+            raise serializers.ValidationError({"discount_value": "percentage discount cannot exceed 100%"})
+        
+        # end date must be after start date
         if start_date and end_date:
             if end_date <= start_date:
-                raise serializers.ValidationError({
-                    "end_date": "End date must be after start date"
-                })
+                raise serializers.ValidationError({"end_date": "end date must be after start date"})
         
         return data
 
@@ -394,12 +398,12 @@ class RegisterSerializer(serializers.ModelSerializer):
     #receives data from frontend for registration and validates it
     password = serializers.CharField(write_only=True)
     subscribed = serializers.BooleanField(write_only=True, required=False, default=False)
-    phone_number = serializers.CharField(required=True)
+    phone = serializers.CharField(required=True)
 
 
     class Meta:
         model = User #creating user model
-        fields = ["username", "email", "phone_number", "password", "subscribed"]
+        fields = ["username", "email", "phone", "password", "subscribed"]
 
     def validate_email(self, value):
         """Validate email format and uniqueness"""
@@ -407,7 +411,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Email is already in use")
         return value
     
-    def validate_phone_number(self, value):
+    def validate_phone(self, value):
         """Phone validation"""
         phone_digits = ''.join(filter(str.isdigit, value))
         if len(phone_digits) < 10:
@@ -417,11 +421,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 # Creates user and inactive profile (activated later)
     def create(self, validated_data):
         subscribed = validated_data.pop("subscribed", False)
-        phone_number = validated_data.pop("phone_number")
+        phone = validated_data.pop("phone")
         #create user (in auth_user table)
         user = User.objects.create_user(**validated_data)
         #create associated profile (in cinema_profile table)
-        Profile.objects.create(user=user, phone_number=phone_number, subscribed=subscribed, status="Inactive")
+        Profile.objects.create(user=user, phone=phone, subscribed=subscribed, status="Inactive")
         #creates empty address for the user
         Address.objects.create(
             user=user,
@@ -469,7 +473,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name', required= False, allow_blank=True)
     last_name = serializers.CharField(source='user.last_name', required=False, allow_blank=True)
     #profile fields
-    phone_number = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
     subscribed = serializers.BooleanField()
     status = serializers.CharField(read_only=True)
 
@@ -488,7 +492,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         user.email = user_data.get('email', user.email)
         user.save()
         #update profile fields
-        instance.phone_number = validated_data.get('phone_number', instance.phone_number)
+        instance.phone = validated_data.get('phone', instance.phone)
         instance.subscribed = validated_data.get('subscribed', instance.subscribed)
         instance.save()
         return instance
@@ -613,12 +617,12 @@ class UserDetailSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
     first_name = serializers.CharField(source='user.first_name')
     last_name = serializers.CharField(source='user.last_name')
-    phone_number = serializers.CharField()
+    phone = serializers.CharField()
     subscribed = serializers.BooleanField()
     status = serializers.CharField(read_only=True)
     class Meta:
         model = Profile
-        fields = ["username", "email", "first_name", "last_name", "phone_number", "subscribed", "status"]
+        fields = ["username", "email", "first_name", "last_name", "phone", "subscribed", "status"]
 
 
 # --- User Portal Serializers ---
@@ -887,9 +891,9 @@ class TicketSerializer(serializers.ModelSerializer):
     
 class BookingCreateSerializer(serializers.Serializer):
     '''
-    Serializer for creating a new booking (checkout process).
+    serializer for creating a new booking including the checkout process
     
-    purpose is to handle user's seat selection and create booking + tickets.
+    purpose is to handle user's seat selection and create booking + tickets
 
     example input:
     {
@@ -898,17 +902,14 @@ class BookingCreateSerializer(serializers.Serializer):
             {"seat_id": 5, "age_category": "Adult"},
             {"seat_id": 6, "age_category": "Child"},
             {"seat_id": 7, "age_category": "Senior"}
-        ]
+        ],
+        "promo_code": "SUMMER20",  # Optional
+        "payment_card_id": 3,  # Use saved card
+        # OR provide new card:
+        "card_number": "4532123456789012",
+        "expiration": "12/2026",
+        "brand": "Visa"
     }
-
-    validation:
-    - showing exists and is in future
-    - all seats exist and are available
-    - no duplicate seat selections
-
-    creates:
-    - 1 Booking record
-    - multiple Ticket records (one per seat)
     '''
 
     showing_id = serializers.IntegerField(required=True)
@@ -919,126 +920,105 @@ class BookingCreateSerializer(serializers.Serializer):
         required=True
     )
 
-    def validate_showing_id(self, value):
-        """Validate showing exists and is in the future."""
-        try:
-            showing = Showing.objects.get(showing_id=value)
-            
-            if showing.start_time < timezone.now():
-                raise serializers.ValidationError(
-                    "Cannot book tickets for past showings"
-                )
-            
-            return value
-        except Showing.DoesNotExist:
-            raise serializers.ValidationError(
-                f"Showing with ID {value} does not exist"
-            )
-        
-    def validate_seats(self, value):
-        """Validate seat selection."""
-        if not value:
-            raise serializers.ValidationError("At least one seat must be selected")
-        
-        for seat_data in value:
-            if 'seat_id' not in seat_data:
-                raise serializers.ValidationError("Each seat must have seat_id")
-            
-            if 'age_category' not in seat_data:
-                raise serializers.ValidationError("Each seat must have age_category")
-            
-            try:
-                Seat.objects.get(seat_id=seat_data['seat_id'])
-            except Seat.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Seat with ID {seat_data['seat_id']} does not exist"
-                )
-            
-            valid_categories = ['Child', 'Adult', 'Senior']
-            if seat_data['age_category'] not in valid_categories:
-                raise serializers.ValidationError(
-                    f"Age category must be one of: {', '.join(valid_categories)}"
-                )
-        
-        return value
-    
+    # optional promotion code
+    promo_code = serializers.CharField(required=False, allow_blank=True)
+
+    # payment: either saved card OR new card info
+    payment_card_id = serializers.IntegerField(required=False)
+    card_number = serializers.CharField(required=False, max_length=19)
+    expiration = serializers.CharField(required=False, max_length=7)  # MM/YYYY
+    brand = serializers.CharField(required=False, max_length=50)
+
+
     def validate(self, data):
-        """Cross-field validation: check availability and correct showroom."""
-        showing_id = data['showing_id']
-        seats_data = data['seats']
-
-        showing = Showing.objects.get(showing_id=showing_id)
-        seat_ids = [s['seat_id'] for s in seats_data]
-
-        # Check for duplicate seat selections
-        if len(seat_ids) != len(set(seat_ids)):
+        """
+        check either saved or new card and validate
+        """
+        payment_card_id = data.get('payment_card_id')
+        card_number = data.get('card_number')
+        
+        # must provide either a saved card ID or new card info
+        if not payment_card_id and not card_number:
             raise serializers.ValidationError({
-                "seats": "Cannot select the same seat multiple times"
+                "payment": "Payment information is required. Provide either payment_card_id or new card details."
             })
         
-        # Validate each seat
+        # if providing new card, all card fields are required
+        if card_number:
+            required_fields = ['expiration', 'brand']
+            for field in required_fields:
+                if not data.get(field):
+                    raise serializers.ValidationError({
+                        field: f"{field} is required when providing new card information"
+                    })
+                
+        # validate seats structure
+        seats_data = data.get('seats', [])
         for seat_data in seats_data:
-            seat = Seat.objects.get(seat_id=seat_data['seat_id'])
-            
-            # Check correct showroom
-            if seat.showroom_id != showing.showroom:
+            if 'seat_id' not in seat_data:
                 raise serializers.ValidationError({
-                    "seats": f"Seat {seat} is not in {showing.showroom.showroom_name}"
+                    "seats": "Each seat must have a seat_id"
                 })
-            
-            # Check availability
-            if Ticket.objects.filter(showing=showing, seat=seat).exists():
+            if 'age_category' not in seat_data:
                 raise serializers.ValidationError({
-                    "seats": f"Seat {seat} is already booked for this showing"
+                    "seats": "Each seat must have an age_category (Child, Adult, or Senior)"
                 })
         
         return data
     
     def create(self, validated_data):
         """
-        Create booking with tickets.
-
-        Process:
-        1. Create Booking
-        2. Create Ticket for each seat
-        3. Return booking with tickets
+        makes booking using the facade pattern to simplify complex process.
+        
+        The Facade takes care of:
+        seat validation
+        price calculation
+        promotion application (Factory Method)
+        payment simulation
+        booking and ticket creation
+        
+        Returns:
+            dict: Complete booking result with all details
         """
-        showing_id = validated_data['showing_id']
-        seats_data = validated_data['seats']
         user = self.context['request'].user
         
-        showing = Showing.objects.get(showing_id=showing_id)
+        # extract data
+        showing_id = validated_data['showing_id']
+        seats_data = validated_data['seats']
+        promo_code = validated_data.get('promo_code', '').strip()
 
-        # Create booking
-        booking = Booking.objects.create(user=user)
+        # build payment info dict
+        payment_info = {}
+        if validated_data.get('payment_card_id'):
+            payment_info['payment_card_id'] = validated_data['payment_card_id']
+        else:
+            payment_info['card_number'] = validated_data.get('card_number')
+            payment_info['expiration'] = validated_data.get('expiration')
+            payment_info['brand'] = validated_data.get('brand')
         
-        # Create tickets
-        tickets = []
-        for seat_data in seats_data:
-            seat = Seat.objects.get(seat_id=seat_data['seat_id'])
-            
-            ticket = Ticket.objects.create(
-                booking=booking,
-                showing=showing,
-                seat=seat,
-                age_category=seat_data['age_category']
-            )
-            tickets.append(ticket)
+        # use Facade to process the entire booking
+        facade = BookingFacade(
+            user=user,
+            showing_id=showing_id,
+            seats_data=seats_data,
+            promo_code=promo_code if promo_code else None,
+            payment_info=payment_info
+        )
         
-        return {
-            'booking': booking,
-            'tickets': tickets
-        }
-    
+        # process booking and return result
+        # the Facade handles all validation, calculation, and creation
+        return facade.process_booking()
+
 class BookingDetailSerializer(serializers.ModelSerializer):
     """
     Detailed serializer for viewing booking history.
     
-    Purpose: Show user their bookings with full details.
+    Purpose: Show user their bookings with full details including promotions and payment.
     
     Example output:
     {
         "booking_id": 123,
+        "booking_time": "2025-12-03T10:30:00Z",
         "user_email": "john@email.com",
         "movie_title": "Inception",
         "showroom_name": "Theater 1",
@@ -1071,6 +1051,7 @@ class BookingDetailSerializer(serializers.ModelSerializer):
         model = Booking
         fields = [
             'booking_id',
+            'booking_time',
             'user_email',
             'movie_title',
             'showroom_name',
@@ -1078,7 +1059,7 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             'tickets',
             'total_price'
         ]
-        read_only_fields = ['booking_id']
+        read_only_fields = ['booking_id', 'booking_time']
     
     def get_total_price(self, obj):
         """Calculate total price for all tickets."""
@@ -1094,3 +1075,436 @@ class BookingDetailSerializer(serializers.ModelSerializer):
         )
         
         return total
+    
+
+# --- Factory Method pattern --- #
+# adding this to handle different promotion types
+# Allows for easy extension of new promotion types without modifying existing code
+
+class PromotionFactory:
+    """
+    factory class is used to create appropriate promotion handler based on promo code.
+    
+    Design Pattern: Factory Method
+    Purpose: Encapsulate promotion logic and allow easy addition of new promotion types.
+    
+    Returns appropriate promotion handler (Percentage, Fixed, or No promotion).
+    """
+    @staticmethod
+    def get_promotion(promo_code):
+        '''
+        creates and returns the appropriate promotion handler based on promo_code.
+
+        Args:
+            promo_code (str): The promo code entered by the user.
+
+        Returns:
+            An instance of a promotion handler (PercentagePromotion, FixedPromotion, NoPromotion).
+        '''
+        if not promo_code:
+            return NoPromotion()
+        
+        try:
+            # query the Promotion model
+            promo = Promotion.objects.get(promo_code__iexact=promo_code)
+
+            # checking if it is valid at the moment
+            from datetime import date
+            today = date.today()
+            if promo.start_date > today:
+                return ExpiredPromotion(promo, 'Promotion has not started yet.')
+            if promo.end_date < today:
+                return ExpiredPromotion(promo, 'Promotion has expired.')
+            
+            # check discount type to decide which handler to use
+            if promo.discount_type == 'percentage':
+                return PercentagePromotion(promo)
+            else:
+                return FixedPromotion(promo)
+            
+        except Promotion.DoesNotExist:
+            return InvalidPromotion()
+
+
+class PercentagePromotion:
+    """
+    handles percentage-based promotions like 20% off
+    discount_value stores the percentage as a whole number (20.00 = 20%)
+    """
+    def __init__(self, promo):
+        self.promo = promo
+        self.promo_code = promo.promo_code
+        self.discount_value = float(promo.discount_value)
+    
+    def apply(self, total_price: float) -> float:
+        """apply percentage discount to total, cant go below 0"""
+        discount_amount = (self.discount_value / 100) * total_price
+        final_price = total_price - discount_amount
+        return round(max(0, final_price), 2)
+
+    def get_discount_display(self, base_price: float) -> str:
+        """show discount as percentage with dollar amount"""
+        discount_amount = (self.discount_value / 100) * base_price
+        return f"{self.discount_value:.0f}% off (-${discount_amount:.2f})"
+    
+    def is_valid(self):
+        """check if promo is still valid"""
+        return True
+class FixedPromotion:
+    """
+    handles fixed dollar amount promotions like $10 off
+    discount_value stores the dollar amount to subtract
+    """
+    def __init__(self, promo):
+        self.promo = promo
+        self.promo_code = promo.promo_code
+        self.discount_value = float(promo.discount_value)
+    
+    def apply(self, total):
+        """subtract fixed amount from total, cant go below 0"""
+        return round(max(0, total - self.discount_value), 2)
+    
+    def get_discount_display(self, total):
+        """show discount as dollar amount"""
+        discount_amount = min(self.discount_value, total)
+        return f"${discount_amount:.2f} off"
+    
+    def is_valid(self):
+        """check if promo is still valid"""
+        return True
+    
+class NoPromotion:
+    """handles when there is no promotion is applied"""
+    def __init__(self):
+        self.promo_code = None
+    
+    def apply(self, total):
+        """no discount applied"""
+        return total
+    
+    def get_discount_display(self, total):
+        """no discount to display"""
+        return "No promotion applied"
+    
+    def is_valid(self):
+        return True
+    
+class InvalidPromotion:
+    """handler for invalid promo codes"""
+    def __init__(self):
+        self.promo_code = None
+        self.error = "Invalid promo code"
+    
+    def apply(self, total):
+        """no discount applied"""
+        return total
+    
+    def get_discount_display(self, total):
+        """return error message"""
+        return self.error
+    
+    def is_valid(self):
+        """invalid promotion"""
+        return False
+    
+class ExpiredPromotion:
+    """handler for expired or not-yet-started promo codes"""
+    def __init__(self, promo, error_message):
+        self.promo = promo
+        self.promo_code = promo.promo_code
+        self.error = error_message
+    
+    def apply(self, total):
+        """no discount applied"""
+        return total
+    
+    def get_discount_display(self, total):
+        """return error message"""
+        return self.error
+    
+    def is_valid(self):
+        """expired/invalid promotion"""
+        return False
+    
+
+# --- Facade Pattern --- #
+# this coordinates booking process
+# makes a single interface
+
+class BookingFacade:
+    '''
+    Coordinates the booking process for users.
+
+    Design Pattern: Facade
+    Provides a simple interface to complex booking operations.
+    
+    Handles:
+    - Validating seats and showing
+    - Calculating total price
+    - Applying promotions (via Factory Method)
+    - Processing payment
+    - Creating booking and tickets
+    '''
+
+    def __init__(self, user, showing_id, seats_data, promo_code=None, payment_info=None):
+        """
+        Initialize the booking facade with input data
+        
+        Args:
+            user: The authenticated user making the booking
+            showing_id: ID of the showing to book
+            seats_data: List of dicts with seat_id and age_category
+            promo_code: Optional promotion code
+            payment_info: Dict with payment card info or payment_card_id
+        """
+        self.user = user
+        self.showing_id = showing_id
+        self.seats_data = seats_data
+        self.promo_code = promo_code
+        self.payment_info = payment_info or {}
+        
+        # Initialize attributes that will be set during processing
+        self.showing = None
+        self.seats = []
+        self.promotion = None
+        self.base_price = 0.0
+        self.final_price = 0.0
+        self.booking = None
+        self.tickets = []
+
+    def process_booking(self):
+        """
+        Main method to process the entire booking flow
+        
+        Returns:
+            dict: Booking result with all details
+        
+        Raises:
+            serializers.ValidationError: If any step fails
+        """
+        try:
+            # validate showing and seats
+            self._validate_showing_and_seats()
+            
+            # calculate base price
+            self._calculate_base_price()
+            
+            # apply promotion (if provided)
+            self._apply_promotion()
+            
+            # simulate payment
+            payment_result = self._simulate_payment()
+            
+            # create booking and tickets
+            self._create_booking_and_tickets()
+            
+            # return complete booking result
+            return self._format_result(payment_result)
+        
+        except Exception as e:
+            # log the error for debugging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Booking failed: {str(e)}")
+            raise
+
+    def _validate_showing_and_seats(self):
+        """
+        Validate showing exists, is in future, and seats are available.
+        """
+        # validate showing exists
+        try:
+            self.showing = Showing.objects.get(showing_id=self.showing_id)
+        except Showing.DoesNotExist:
+            raise serializers.ValidationError(f"Showing with ID {self.showing_id} does not exist")
+        
+        # validate showing is in the future
+        if self.showing.start_time < timezone.now():
+            raise serializers.ValidationError("Cannot book tickets for past showings")
+        
+        # get all seat IDs
+        seat_ids = [s['seat_id'] for s in self.seats_data]
+
+        # check for duplicate seat selections
+        if len(seat_ids) != len(set(seat_ids)):
+            raise serializers.ValidationError("Cannot select the same seat multiple times")
+        
+        # validate each seat
+        for seat_data in self.seats_data:
+            try:
+                seat = Seat.objects.get(seat_id=seat_data['seat_id'])
+            except Seat.DoesNotExist:
+                raise serializers.ValidationError(f"Seat with ID {seat_data['seat_id']} does not exist")
+            
+            # check seat belongs to correct showroom (compare objects)
+            if seat.showroom_id != self.showing.showroom:
+                raise serializers.ValidationError(
+                    f"Seat {seat.row_label}{seat.seat_number} is not in {self.showing.showroom.showroom_name}"
+                )
+            
+            # check seat availability
+            if Ticket.objects.filter(showing=self.showing, seat=seat).exists():
+                raise serializers.ValidationError(
+                    f"Seat {seat.row_label}{seat.seat_number} is already booked for this showing"
+                )
+            
+            # validate age category
+            valid_categories = ['Child', 'Adult', 'Senior']
+            if seat_data['age_category'] not in valid_categories:
+                raise serializers.ValidationError(
+                    f"Age category must be one of: {', '.join(valid_categories)}"
+                )
+            
+            self.seats.append({
+                'seat': seat,
+                'age_category': seat_data['age_category']
+            })
+    
+    def _calculate_base_price(self):
+        """
+        Calculate base price based on ticket types
+        
+        Pricing:
+        - Child: $8.00
+        - Adult: $12.00
+        - Senior: $10.00
+        """
+        pricing = {
+            'Child': 8.00,
+            'Adult': 12.00,
+            'Senior': 10.00
+        }
+        
+        self.base_price = sum(
+            pricing.get(seat_info['age_category'], 12.00)
+            for seat_info in self.seats
+        )
+        
+        # start with base price (will be modified by promotion)
+        self.final_price = self.base_price
+    
+    def _apply_promotion(self):
+        """
+        Apply promotion using Factory Method pattern.
+        """
+        # Use Factory Method to get the correct promotion handler
+        self.promotion = PromotionFactory.get_promotion(self.promo_code)
+        
+        # apply promotion to calculate final price
+        if self.promotion.is_valid():
+            self.final_price = self.promotion.apply(self.base_price)
+
+    def _simulate_payment(self):
+        """
+        Simulate payment processing
+        
+        Returns:
+            dict: Payment result with card info
+        """
+        payment_card_id = self.payment_info.get('payment_card_id')
+        
+        if payment_card_id:
+            # use saved card
+            try:
+                card = PaymentCard.objects.get(pk=payment_card_id, user=self.user)
+                
+                # check if card is expired
+                if card.is_expired():
+                    raise serializers.ValidationError("Selected card is expired")
+                
+                return {
+                    'payment_method': 'saved_card',
+                    'last4': card.get_masked_card_number()[-4:],
+                    'brand': card.brand,
+                    'card_id': card.id
+                }
+            except PaymentCard.DoesNotExist:
+                raise serializers.ValidationError("Selected payment card does not exist or does not belong to you")
+        
+        else:
+            # process new card
+            card_number = self.payment_info.get('card_number')
+            expiration = self.payment_info.get('expiration')
+            brand = self.payment_info.get('brand')
+            
+            if not all([card_number, expiration, brand]):
+                raise serializers.ValidationError("Complete payment card information is required")
+            
+            # validate card number format
+            card_digits = ''.join(filter(str.isdigit, card_number))
+            if len(card_digits) < 13 or len(card_digits) > 19:
+                raise serializers.ValidationError("Invalid card number format")
+            
+            # validate expiration date
+            try:
+                month, year = expiration.split('/')
+                month = int(month)
+                year = int(year)
+                
+                if month < 1 or month > 12:
+                    raise serializers.ValidationError("Invalid expiration month")
+                
+                from datetime import datetime
+                current_year = datetime.now().year
+                current_month = datetime.now().month
+                
+                if year < current_year or (year == current_year and month < current_month):
+                    raise serializers.ValidationError("Card is expired")
+            except (ValueError, AttributeError):
+                raise serializers.ValidationError("Expiration must be in MM/YYYY format")
+            
+            # simulate successful payment
+            return {
+                'payment_method': 'new_card',
+                'last4': card_digits[-4:],
+                'brand': brand,
+                'card_number': card_digits  # Would be encrypted in production
+            }
+
+    def _create_booking_and_tickets(self):
+        """
+        Create booking and ticket records in the database
+        """
+        # Create the booking
+        self.booking = Booking.objects.create(
+            user=self.user,
+            total_price=self.final_price,
+            promo_code=self.promo_code or ''
+        )
+        
+        # create tickets for each seat
+        for seat_info in self.seats:
+            ticket = Ticket.objects.create(
+                booking=self.booking,
+                showing=self.showing,
+                seat=seat_info['seat'],
+                age_category=seat_info['age_category']
+            )
+            self.tickets.append(ticket)
+
+    def _format_result(self, payment_result):
+        """
+        Format and return the complete booking result
+        
+        Returns:
+            dict: Complete booking information for API response
+        """
+        return {
+            'booking_id': self.booking.booking_id,
+            'user_email': self.user.email,
+            'movie_title': self.showing.movie.movie_title,
+            'showroom_name': self.showing.showroom.showroom_name,
+            'start_time': self.showing.start_time,
+            'seats': [
+                {
+                    'seat_display': f"{ticket.seat.row_label}{ticket.seat.seat_number}",
+                    'age_category': ticket.age_category
+                }
+                for ticket in self.tickets
+            ],
+            'base_price': f"${self.base_price:.2f}",
+            'promotion_applied': self.promotion.promo_code if self.promotion.is_valid() else None,
+            'discount_display': self.promotion.get_discount_display(self.base_price),
+            'final_price': f"${self.final_price:.2f}",
+            'payment': payment_result,
+            'booking_time': self.booking.booking_time
+        }
