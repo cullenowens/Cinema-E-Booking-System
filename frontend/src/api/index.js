@@ -84,6 +84,8 @@ export const updateProfile = async (profileData) => {
     {
       phone: profileData.phone,
       subscribed: profileData.subscribed,
+      first_name: profileData.firstName,
+      last_name: profileData.lastName,
     },
     {
       headers: {
@@ -262,5 +264,29 @@ export const getUserMovieShowings = async (movieId) => {
 
 export const getShowingSeats = async (showingId) => {
   const res = await axios.get(`${url}/user/showings/${showingId}/seats/`);
+  return res.data;
+};
+
+export const previewBooking = async (bookingData) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.post(`${url}/user/bookings/preview/`, bookingData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const createBooking = async (bookingData) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.post(`${url}/user/bookings/create/`, bookingData, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
+export const getBookings = async () => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.get(`${url}/user/bookings/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   return res.data;
 };

@@ -70,13 +70,17 @@ const ProfilePage = () => {
     e.preventDefault();
 
     try {
+      // Pass first and last name to the API function
       const result = await updateProfile({
         phone: formData.phone,
         subscribed: formData.promotions,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
       });
 
+      // Use formData.address for the street field
       const addressRes = await updateAddress({
-        street: formData.street,
+        street: formData.address,
         city: formData.city,
         state: formData.state,
         zip_code: formData.zipCode,
@@ -84,12 +88,11 @@ const ProfilePage = () => {
 
       alert("Profile updated");
     } catch (err) {
-      if (err.response.status === 404) {
-        await axios.post(`${url}/auth/address/`, addressData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      // Fix error variable naming (err vs error)
+      if (err.response && err.response.status === 404) {
+        // Handle address creation if it doesn't exist (optional logic)
       }
-      console.error("Error updating profile:", error);
+      console.error("Error updating profile:", err);
     }
   };
 
@@ -149,8 +152,8 @@ const ProfilePage = () => {
                   type="text"
                   name="username"
                   value={formData.username}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  readOnly
+                  className="w-full p-3 rounded-lg bg-gray-600 text-gray-300 cursor-not-allowed focus:outline-none"
                 />
               </div>
 

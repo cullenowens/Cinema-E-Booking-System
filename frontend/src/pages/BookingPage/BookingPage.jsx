@@ -5,6 +5,9 @@ import {
   getMovieDetails,
   getUserMovieShowings,
   getShowingSeats,
+  getPaymentCards,
+  previewBooking,
+  createBooking,
 } from "../../api";
 
 const BookingPage = () => {
@@ -17,15 +20,31 @@ const BookingPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 2.3 Ticket Selection States
+  // Ticket Selection States
   const [tickets, setTickets] = useState({
     Adult: 0,
     Child: 0,
     Senior: 0,
   });
 
-  // 2.4 Seat Selection State
+  // Seat Selection State
   const [selectedSeats, setSelectedSeats] = useState([]);
+
+  // Checkout Modal States
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [paymentCards, setPaymentCards] = useState([]);
+  const [selectedCardId, setSelectedCardId] = useState("");
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [previewData, setPreviewData] = useState(null);
+
+  // Updated to include CVV
+  const [newCardData, setNewCardData] = useState({
+    cardNumber: "",
+    expiration: "",
+    cvv: "", // Added CVV here
+    brand: "",
+  });
 
   const decodedShowtime = decodeURIComponent(showtime);
   const totalTickets = tickets.Adult + tickets.Child + tickets.Senior;
@@ -37,15 +56,12 @@ const BookingPage = () => {
       try {
         setLoading(true);
 
-        // 1. Fetch Movie Details
         const movieData = await getMovieDetails(id);
         setMovie(movieData);
 
-        // 2. Fetch showings to find the matching showing ID from the URL string
         const showingsRes = await getUserMovieShowings(id);
         const allShowings = showingsRes.showings || [];
 
-        // Match the showtime string from URL to a specific showing record
         const matchedShowing = allShowings.find((s) => {
           const sTime = new Date(s.start_time);
           return (
@@ -57,8 +73,6 @@ const BookingPage = () => {
 
         if (matchedShowing) {
           setShowing(matchedShowing);
-
-          // 3. Fetch Seat Map using the centralized API function
           const seatRes = await getShowingSeats(matchedShowing.showing_id);
           setSeatMap(seatRes.seats_by_row || {});
         } else {
@@ -79,30 +93,23 @@ const BookingPage = () => {
   const handleTicketChange = (category, change) => {
     setTickets((prev) => {
       const newVal = Math.max(0, prev[category] + change);
-
-      // If total tickets decrease below selected seats, deselect the most recent ones
-      // This ensures 2.4 constraints are met (seats selected <= tickets)
       const newTotal = totalTickets - prev[category] + newVal;
       if (newTotal < selectedSeats.length) {
         setSelectedSeats((prevSeats) => prevSeats.slice(0, newTotal));
       }
-
       return { ...prev, [category]: newVal };
     });
   };
 
-  // Handle Seat Selection (2.4)
+  // Handle Seat Selection
   const handleSeatClick = (seat) => {
-    // System enforces availability
     if (!seat.is_available) return;
 
     const isSelected = selectedSeats.includes(seat.seat_id);
 
     if (isSelected) {
-      // Deselect
       setSelectedSeats((prev) => prev.filter((id) => id !== seat.seat_id));
     } else {
-      // Select: System prevents invalid selections (more seats than tickets)
       if (selectedSeats.length < totalTickets) {
         setSelectedSeats((prev) => [...prev, seat.seat_id]);
       } else {
@@ -117,13 +124,100 @@ const BookingPage = () => {
     }
   };
 
-  const handleCheckout = () => {
+  // Helper: Construct seats payload with age categories
+  const constructSeatsPayload = () => {
+    const ticketTypes = [];
+    Object.entries(tickets).forEach(([type, count]) => {
+      for (let i = 0; i < count; i++) {
+        ticketTypes.push(type);
+      }
+    });
+
+    return selectedSeats.map((seatId, index) => ({
+      seat_id: seatId,
+      age_category: ticketTypes[index] || "Adult",
+    }));
+  };
+
+  // Open Checkout Modal
+  const handleProceedToCheckout = async () => {
     if (selectedSeats.length !== totalTickets || totalTickets === 0) {
       alert("Please select seats for all your tickets.");
       return;
     }
-    // Checkout logic not implemented yet per requirements
-    alert("Proceeding to checkout...");
+
+    setShowCheckout(true);
+    try {
+      const cards = await getPaymentCards();
+      setPaymentCards(cards);
+      if (cards.length > 0) {
+        setSelectedCardId(cards[0].id);
+      } else {
+        setUseNewCard(true);
+      }
+    } catch (err) {
+      console.error("Failed to fetch payment cards", err);
+    }
+
+    await updatePreview();
+  };
+
+  const updatePreview = async (code = "") => {
+    try {
+      const payload = {
+        showing_id: showing.showing_id,
+        seats: constructSeatsPayload(),
+        promo_code: code || promoCode,
+      };
+      const data = await previewBooking(payload);
+      setPreviewData(data);
+    } catch (err) {
+      console.error("Preview failed", err);
+      if (code) alert("Invalid or expired promo code");
+    }
+  };
+
+  const handleConfirmBooking = async () => {
+    try {
+      const seatsPayload = constructSeatsPayload();
+      const bookingPayload = {
+        showing_id: showing.showing_id,
+        seats: seatsPayload,
+        promo_code: promoCode,
+      };
+
+      if (useNewCard) {
+        // Updated validation to check for CVV
+        if (
+          !newCardData.cardNumber ||
+          !newCardData.expiration ||
+          !newCardData.brand ||
+          !newCardData.cvv
+        ) {
+          alert("Please fill in all card details, including CVV.");
+          return;
+        }
+        bookingPayload.card_number = newCardData.cardNumber;
+        bookingPayload.expiration = newCardData.expiration;
+        bookingPayload.brand = newCardData.brand;
+        bookingPayload.cvv = newCardData.cvv; // Passed to backend
+      } else {
+        if (!selectedCardId) {
+          alert("Please select a payment card.");
+          return;
+        }
+        bookingPayload.payment_card_id = selectedCardId;
+      }
+
+      const res = await createBooking(bookingPayload);
+      alert("Booking confirmed! Check your email.");
+      navigate("/profile");
+    } catch (err) {
+      console.error("Booking failed", err);
+      const msg =
+        err.response?.data?.error || "Booking failed. Please try again.";
+      alert(msg);
+    }
   };
 
   if (loading)
@@ -141,13 +235,12 @@ const BookingPage = () => {
   if (!movie || !showing) return null;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gray-900 text-white relative">
       <Navbar />
 
       <div className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* LEFT COLUMN: Movie Info & Ticket Selection */}
+        {/* LEFT COLUMN */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Movie Info Card */}
           <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
             <h1 className="text-2xl font-bold mb-2 text-white">
               {movie.movie_title}
@@ -178,7 +271,6 @@ const BookingPage = () => {
             </div>
           </div>
 
-          {/* 2.3 Ticket Category Selection */}
           <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
             <h2 className="text-xl font-bold mb-4 text-red-300 border-b border-gray-700 pb-2">
               Select Tickets
@@ -215,9 +307,8 @@ const BookingPage = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Seat Map & Selection */}
+        {/* RIGHT COLUMN */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 2.3 & 2.4 Seat Selection Interface */}
           <div className="bg-gray-800 rounded-xl p-8 border border-gray-700 shadow-lg min-h-[600px] flex flex-col">
             <h2 className="text-2xl font-bold mb-2 text-center">
               Select Seats
@@ -260,13 +351,13 @@ const BookingPage = () => {
                         const isAvailable = seat.is_available;
 
                         let seatClasses =
-                          "bg-gray-600 hover:bg-gray-500 cursor-pointer border-gray-500"; // Default Available
+                          "bg-gray-600 hover:bg-gray-500 cursor-pointer border-gray-500";
                         if (!isAvailable)
                           seatClasses =
-                            "bg-gray-900 cursor-not-allowed text-gray-700 border-gray-800"; // Occupied
+                            "bg-gray-900 cursor-not-allowed text-gray-700 border-gray-800";
                         if (isSelected)
                           seatClasses =
-                            "bg-green-500 text-white border-green-400 shadow-[0_0_10px_rgba(34,197,94,0.5)] transform scale-110"; // Selected
+                            "bg-green-500 text-white border-green-400 shadow-[0_0_10px_rgba(34,197,94,0.5)] transform scale-110";
 
                         return (
                           <button
@@ -304,10 +395,9 @@ const BookingPage = () => {
             </div>
           </div>
 
-          {/* Checkout Button */}
           <div className="flex justify-end">
             <button
-              onClick={handleCheckout}
+              onClick={handleProceedToCheckout}
               disabled={
                 totalTickets === 0 || selectedSeats.length !== totalTickets
               }
@@ -322,6 +412,213 @@ const BookingPage = () => {
           </div>
         </div>
       </div>
+
+      {/* CHECKOUT MODAL */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 overflow-y-auto">
+          <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl border border-gray-700">
+            <div className="p-6 border-b border-gray-700 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-white">Checkout</h2>
+              <button
+                onClick={() => setShowCheckout(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Order Summary */}
+              <div>
+                <h3 className="text-lg font-semibold text-red-300 mb-3">
+                  Order Summary
+                </h3>
+                <div className="bg-gray-700/50 rounded-lg p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Movie:</span>
+                    <span className="text-white font-medium">
+                      {movie.movie_title}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tickets:</span>
+                    <span className="text-white">
+                      {tickets.Adult} Adult, {tickets.Child} Child,{" "}
+                      {tickets.Senior} Senior
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Seats:</span>
+                    <span className="text-white">
+                      {previewData?.seats
+                        ?.map((s) => s.seat_display)
+                        .join(", ") || "Loading..."}
+                    </span>
+                  </div>
+                  <div className="pt-2 mt-2 border-t border-gray-600 flex justify-between">
+                    <span>Base Price:</span>
+                    <span>{previewData?.base_price}</span>
+                  </div>
+                  {previewData?.discount_amount && (
+                    <div className="flex justify-between text-green-400">
+                      <span>Discount ({previewData.promotion_applied}):</span>
+                      <span>{previewData.discount_display}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xl font-bold text-white pt-2">
+                    <span>Total:</span>
+                    <span>{previewData?.final_price}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Promo Code */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Promo Code
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    className="flex-1 px-4 py-2 bg-gray-700 rounded-lg text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="Enter code"
+                  />
+                  <button
+                    onClick={() => updatePreview(promoCode)}
+                    className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <h3 className="text-lg font-semibold text-red-300 mb-3">
+                  Payment Method
+                </h3>
+
+                {paymentCards.length > 0 && (
+                  <div className="flex gap-4 mb-4">
+                    <button
+                      onClick={() => setUseNewCard(false)}
+                      className={`flex-1 py-2 rounded-lg transition-colors ${
+                        !useNewCard
+                          ? "bg-red-500 text-white"
+                          : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                      }`}
+                    >
+                      Saved Card
+                    </button>
+                    <button
+                      onClick={() => setUseNewCard(true)}
+                      className={`flex-1 py-2 rounded-lg transition-colors ${
+                        useNewCard
+                          ? "bg-red-500 text-white"
+                          : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                      }`}
+                    >
+                      New Card
+                    </button>
+                  </div>
+                )}
+
+                {!useNewCard && paymentCards.length > 0 ? (
+                  <select
+                    value={selectedCardId}
+                    onChange={(e) => setSelectedCardId(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-700 rounded-lg text-white border border-gray-600 focus:ring-2 focus:ring-red-500"
+                  >
+                    {paymentCards.map((card) => (
+                      <option key={card.id} value={card.id}>
+                        {card.brand} ending in{" "}
+                        {card.card_number_enc
+                          ? "****" + card.card_number_enc.slice(-4)
+                          : "****"}{" "}
+                        (Exp: {card.expiration})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      placeholder="Card Number"
+                      className="w-full px-4 py-3 bg-gray-700 rounded-lg text-white border border-gray-600"
+                      value={newCardData.cardNumber}
+                      maxLength="19"
+                      onChange={(e) =>
+                        setNewCardData({
+                          ...newCardData,
+                          cardNumber: e.target.value.replace(/\D/g, ""),
+                        })
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        type="text"
+                        placeholder="MM/YYYY"
+                        className="w-full px-4 py-3 bg-gray-700 rounded-lg text-white border border-gray-600"
+                        value={newCardData.expiration}
+                        maxLength="7"
+                        onChange={(e) =>
+                          setNewCardData({
+                            ...newCardData,
+                            expiration: e.target.value,
+                          })
+                        }
+                      />
+                      {/* Added CVV Input Field Here */}
+                      <input
+                        type="text"
+                        placeholder="CVV"
+                        className="w-full px-4 py-3 bg-gray-700 rounded-lg text-white border border-gray-600"
+                        value={newCardData.cvv}
+                        maxLength="4"
+                        onChange={(e) =>
+                          setNewCardData({
+                            ...newCardData,
+                            cvv: e.target.value.replace(/\D/g, ""),
+                          })
+                        }
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Brand (Visa, MasterCard)"
+                      className="w-full px-4 py-3 bg-gray-700 rounded-lg text-white border border-gray-600"
+                      value={newCardData.brand}
+                      onChange={(e) =>
+                        setNewCardData({
+                          ...newCardData,
+                          brand: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-700 flex gap-4">
+              <button
+                onClick={() => setShowCheckout(false)}
+                className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleConfirmBooking}
+                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors shadow-lg"
+              >
+                Confirm & Pay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
