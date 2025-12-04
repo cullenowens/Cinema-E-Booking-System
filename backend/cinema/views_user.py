@@ -404,9 +404,10 @@ class BookingCreateView(APIView):
             # serializer.save() calls BookingFacade.process_booking()
             # which returns the complete formatted result
             result = serializer.save()
-            #creates booking and tickets
-            booking = result['booking']
-            tickets = result['tickets']
+            
+            #get the actual booking and tickets from database
+            booking = Booking.objects.get(booking_id=result['booking_id'])
+            tickets = Ticket.objects.filter(booking=booking)
             
             logger.info(
                 f"Booking created: #{result['booking_id']} "
@@ -416,19 +417,28 @@ class BookingCreateView(APIView):
             #booking confirmation email logic
             try:
                 user = request.user
-                #get booking details
+                
+                #get booking details from first ticket
                 movie_title = tickets[0].showing.movie.movie_title
                 showroom_name = tickets[0].showing.showroom.showroom_name
                 start_time = tickets[0].showing.start_time.strftime("%Y-%m-%d %H:%M")
-                #build ticket list
+                #build ticket list with prices from age category
                 ticket_details = []
-                total_price = 0
+                ticket_prices = {'Adult': 12.00, 'Child': 8.00, 'Senior': 10.00}
                 for ticket in tickets:
+                    price = ticket_prices.get(ticket.age_category, 12.00)
                     ticket_details.append(
-                        f"Seat: {ticket.seat.__str__()}, Category: {ticket.age_category}, Price: ${ticket.price:.2f}"
+                        f"Seat: {ticket.seat.__str__()}, Category: {ticket.age_category}, Price: ${price:.2f}"
                     )
-                    total_price += ticket.price
                 ticket_list = "\n".join(ticket_details)
+                
+                promo_info = ""
+                if result.get('promotion_applied'):
+                    promo_info = (
+                        f"\nPROMO CODE APPLIED: {result['promotion_applied']}\n"
+                        f"Discount: {result['discount_display']}\n"
+                    )
+                
                 #email sending
                 #smtp session created
                 s = smtplib.SMTP('smtp.gmail.com', 587)
@@ -452,15 +462,17 @@ class BookingCreateView(APIView):
                     f"Thank you for your booking with Cinema E-Booking System!\n\n"
                     f"Your booking has been confirmed. Here are your details:\n\n"
                     f"BOOKING CONFIRMATION\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"==========================================\n"
                     f"Booking ID: #{booking.booking_id}\n"
                     f"Movie: {movie_title}\n"
                     f"Theater: {showroom_name}\n"
                     f"Showtime: {start_time}\n\n"
                     f"YOUR TICKETS:\n"
-                    f"{ticket_list}\n\n"
-                    f"TOTAL PRICE: ${total_price:.2f}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"{ticket_list}\n"
+                    f"\nBase Price: {result['base_price']}"
+                    f"{promo_info}"
+                    f"\nFINAL PRICE: {result['final_price']}\n"
+                    f"==========================================\n\n"
                     f"Please arrive 15 minutes before showtime.\n"
                     f"Present this confirmation email or your Booking ID at the theater.\n\n"
                     f"Need to make changes? Log in to your account to view or cancel your booking.\n\n"
@@ -468,7 +480,7 @@ class BookingCreateView(APIView):
                     f"Cinema E-Booking System Team"
                 )
                 #sends the mail
-                s.sendmail(gmail_email, user.email, message)
+                s.sendmail(gmail_email, user.email, message.encode('utf-8'))
                 s.quit()
                 print(f"Booking email sent to {user.email}")
             except Exception as e:
