@@ -239,9 +239,8 @@ class Profile(models.Model):
 class Promotion(models.Model):
     promo_id = models.AutoField(primary_key=True)
     promo_code = models.CharField(max_length=100, unique=True)
-    discount = models.DecimalField(max_digits=5, decimal_places=2)
-    discount_type = models.CharField(max_length=20, default='percentage')  # NEW
-    discount_value = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)  # NEW
+    discount_type = models.CharField(max_length=20, default='percentage')
+    discount_value = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -251,7 +250,10 @@ class Promotion(models.Model):
         managed = False  # Don't let Django manage this table
     
     def __str__(self):
-        return f"{self.promo_code} - {self.discount_type} {self.discount_value}"
+        if self.discount_type == 'percentage':
+            return f"{self.promo_code} - {self.discount_value}% off"
+        else:
+            return f"{self.promo_code} - ${self.discount_value} off"
     
     def is_valid(self):
         """Check if promotion is currently valid"""
