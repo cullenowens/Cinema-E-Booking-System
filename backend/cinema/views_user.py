@@ -12,6 +12,9 @@ from django.db.models import Q, Count
 from collections import defaultdict
 import logging
 from datetime import datetime
+import smtplib
+import os
+from dotenv import load_dotenv
 
 from .models import Showing, Showroom, Seat, Booking, Ticket, Movie
 from .serializers import (
@@ -22,7 +25,7 @@ from .serializers import (
     BookingDetailSerializer,
     TicketSerializer
 )
-
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Browse available showings 
@@ -384,6 +387,69 @@ class BookingCreateView(APIView):
                 f"by {request.user.username} "
                 f"with {len(tickets)} tickets"
             )
+            #booking confirmation email logic
+            try:
+                user = request.user
+                #get booking details
+                movie_title = tickets[0].showing.movie.movie_title
+                showroom_name = tickets[0].showing.showroom.showroom_name
+                start_time = tickets[0].showing.start_time.strftime("%Y-%m-%d %H:%M")
+                #build ticket list
+                ticket_details = []
+                total_price = 0
+                for ticket in tickets:
+                    ticket_details.append(
+                        f"Seat: {ticket.seat.__str__()}, Category: {ticket.age_category}, Price: ${ticket.price:.2f}"
+                    )
+                    total_price += ticket.price
+                ticket_list = "\n".join(ticket_details)
+                #email sending
+                #smtp session created
+                s = smtplib.SMTP('smtp.gmail.com', 587)
+                #start TLS for security
+                s.starttls()
+
+                # Get Gmail credentials from environment variables
+                gmail_email = os.getenv("GMAIL_EMAIL")
+                gmail_password = os.getenv("GMAIL_PASS")
+
+                #authentication
+                print(f"Gmail email: {gmail_email}")
+                print(f"Gmail password loaded: {'Yes' if gmail_password else 'No'}")
+
+                # login to gmail
+                s.login(gmail_email, gmail_password)
+                #email message
+                message = (
+                    f"Subject: Booking Confirmation - {movie_title}\n\n"
+                    f"Hello {user.username},\n\n"
+                    f"Thank you for your booking with Cinema E-Booking System!\n\n"
+                    f"Your booking has been confirmed. Here are your details:\n\n"
+                    f"BOOKING CONFIRMATION\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Booking ID: #{booking.booking_id}\n"
+                    f"Movie: {movie_title}\n"
+                    f"Theater: {showroom_name}\n"
+                    f"Showtime: {start_time}\n\n"
+                    f"YOUR TICKETS:\n"
+                    f"{ticket_list}\n\n"
+                    f"TOTAL PRICE: ${total_price:.2f}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"Please arrive 15 minutes before showtime.\n"
+                    f"Present this confirmation email or your Booking ID at the theater.\n\n"
+                    f"Need to make changes? Log in to your account to view or cancel your booking.\n\n"
+                    f"Enjoy the show!\n\n"
+                    f"Cinema E-Booking System Team"
+                )
+                #sends the mail
+                s.sendmail(gmail_email, user.email, message)
+                s.quit()
+                print(f"Booking email sent to {user.email}")
+            except Exception as e:
+                print(f"Failed to send booking confirmation email: {e}")
+                logger.error(f"Failed to send booking confirmation email: {e}")
+                pass  # continue even if email fails
+
             
             return Response(
                 detail_serializer.data,
