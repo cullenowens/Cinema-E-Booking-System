@@ -23,7 +23,8 @@ from .serializers import (
     SeatAvailabilitySerializer,
     BookingCreateSerializer,
     BookingDetailSerializer,
-    TicketSerializer
+    TicketSerializer,
+    PromotionFactory
 )
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -325,6 +326,183 @@ class SeatAvailabilityView(APIView):
             )
     
 # Booking views: create and manage bookings
+
+class BookingPreviewView(APIView):
+    '''
+    Preview booking total before confirming.
+    
+    purpose is user see order total with promo applied BEFORE creating booking
+    
+    POST /api/user/bookings/preview/
+    
+    Request body:
+    {
+        "showing_id": 13,
+        "seats": [
+            {"seat_id": 1, "age_category": "Adult"},
+            {"seat_id": 2, "age_category": "Child"}
+        ],
+        "promo_code": "SUMMER20"  # Optional
+    }
+    
+    Response:
+    {
+        "showing": {
+            "movie_title": "Minecraft",
+            "showroom_name": "Showroom A",
+            "start_time": "2025-12-11T19:30:00Z"
+        },
+        "seats": [
+            {"seat_display": "A1", "age_category": "Adult", "price": "$12.00"},
+            {"seat_display": "A2", "age_category": "Child", "price": "$8.00"}
+        ],
+        "base_price": "$20.00",
+        "promotion_applied": "SUMMER20",
+        "discount_display": "20% off",
+        "discount_amount": "$4.00",
+        "final_price": "$16.00"
+    }
+    '''
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        '''calculate booking total without creating booking'''
+        try:
+            from decimal import Decimal
+            from .models import Promotion
+            
+            showing_id = request.data.get('showing_id')
+            seat_data = request.data.get('seats', [])
+            promo_code = request.data.get('promo_code')
+            
+            # validate showing exists
+            try:
+                showing = Showing.objects.select_related('movie', 'showroom').get(showing_id=showing_id)
+            except Showing.DoesNotExist:
+                return Response(
+                    {'error': 'Showing not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # validate seats exist and are available
+            seat_ids = [s['seat_id'] for s in seat_data]
+            seats = Seat.objects.filter(seat_id__in=seat_ids)
+            
+            if len(seats) != len(seat_ids):
+                return Response(
+                    {'error': 'One or more seats not found'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # verify all seats belong to the showing's showroom
+            for seat in seats:
+                if seat.showroom_id_id != showing.showroom_id:
+                    return Response(
+                        {'error': f'Seat {seat.seat_id} does not belong to this showroom'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # check if seats are available (check if any tickets exist for these seats in this showing)
+            occupied_seat_ids = Ticket.objects.filter(
+                seat_id__in=seat_ids,
+                showing_id=showing.showing_id
+            ).values_list('seat_id', flat=True)
+            
+            if occupied_seat_ids:
+                return Response(
+                    {'error': f'Seats already occupied: {list(occupied_seat_ids)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # calculate base price
+            base_price = Decimal('0.00')
+            seat_details = []
+            
+            for seat_info in seat_data:
+                seat = seats.get(seat_id=seat_info['seat_id'])
+                age_category = seat_info['age_category']
+                
+                # get ticket price based on age category
+                if age_category == 'Adult':
+                    price = Decimal('12.00')
+                elif age_category == 'Child':
+                    price = Decimal('8.00')
+                elif age_category == 'Senior':
+                    price = Decimal('10.00')
+                else:
+                    return Response(
+                        {'error': f'Invalid age category: {age_category}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                base_price += price
+                seat_details.append({
+                    'seat_display': f"{seat.row_label}{seat.seat_number}",
+                    'age_category': age_category,
+                    'price': f"${price:.2f}"
+                })
+            
+            # apply promotion if provided
+            discount_amount = Decimal('0.00')
+            discount_display = None
+            promotion_applied = None
+            
+            if promo_code:
+                try:
+                    promotion = Promotion.objects.get(
+                        promo_code=promo_code,
+                        start_date__lte=timezone.now().date(),
+                        end_date__gte=timezone.now().date()
+                    )
+                    
+                    # use Factory Method to create promotion handler
+                    promo_handler = PromotionFactory.get_promotion(promo_code)
+                    
+                    # Convert Decimal to float for promotion calculation
+                    base_price_float = float(base_price)
+                    final_price_after_promo = promo_handler.apply(base_price_float)
+                    discount_amount = Decimal(str(base_price_float - final_price_after_promo))
+                    discount_display = promo_handler.get_discount_display(base_price_float)
+                    promotion_applied = promo_code
+                    
+                    logger.info(f"Preview: Applied promo '{promo_code}' - {discount_display}")
+                    
+                except Promotion.DoesNotExist:
+                    return Response(
+                        {'error': 'Invalid or expired promotion code'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            final_price = base_price - discount_amount
+            
+            # build response
+            response_data = {
+                'showing': {
+                    'movie_title': showing.movie.movie_title,
+                    'showroom_name': showing.showroom.showroom_name,
+                    'start_time': showing.start_time.isoformat()
+                },
+                'seats': seat_details,
+                'base_price': f"${base_price:.2f}",
+                'final_price': f"${final_price:.2f}"
+            }
+            
+            # add promotion details if applied
+            if promotion_applied:
+                response_data['promotion_applied'] = promotion_applied
+                response_data['discount_display'] = discount_display
+                response_data['discount_amount'] = f"${discount_amount:.2f}"
+            
+            logger.info(f"Booking preview for user {request.user.username}: Base ${base_price}, Final ${final_price}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Booking preview error: {str(e)}")
+            return Response(
+                {'error': f'Preview failed: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class BookingCreateView(APIView):
     '''

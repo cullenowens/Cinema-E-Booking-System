@@ -138,6 +138,7 @@ from .views_user import (
     ShowingDetailView,
     SeatMapView,
     SeatAvailabilityView,
+    BookingPreviewView,
     BookingCreateView,
     BookingListView,
     BookingDetailView,
@@ -155,6 +156,7 @@ urlpatterns += [
 
     # Bookings - Requires authentication
     path('api/user/bookings/', BookingListView.as_view(), name='user-booking-list'),
+    path('api/user/bookings/preview/', BookingPreviewView.as_view(), name='booking-preview'),
     path('api/user/bookings/create/', BookingCreateView.as_view(), name='booking-create'),
     path('api/user/bookings/<int:pk>/', BookingDetailView.as_view(), name='user-booking-detail'),
 
