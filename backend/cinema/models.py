@@ -154,7 +154,7 @@ class Showing(models.Model):
 
 class Booking(models.Model):
     """
-    Represents a user's booking for a specific showing
+    Represents a user's booking
     """
     booking_id = models.AutoField(primary_key=True)
 
@@ -162,9 +162,12 @@ class Booking(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         db_column='user_id',
-        # added so we can access bookings from user instance (Access via user.bookings.all())
         related_name='bookings'
     )
+
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    promo_code = models.CharField(max_length=100, null=True, blank=True)
+    booking_time = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'bookings'
@@ -235,19 +238,26 @@ class Profile(models.Model):
     
 class Promotion(models.Model):
     promo_id = models.AutoField(primary_key=True)
-    discount = models.DecimalField(max_digits=5, decimal_places=2)
     promo_code = models.CharField(max_length=100, unique=True)
+    discount = models.DecimalField(max_digits=5, decimal_places=2)
+    discount_type = models.CharField(max_length=20, default='percentage')  # NEW
+    discount_value = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)  # NEW
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
-    #is_active = models.BooleanField(default=True)
-
+    
     class Meta:
         db_table = 'cinema_promotions'
-        managed = False
-
+        managed = False  # Don't let Django manage this table
+    
     def __str__(self):
-        return f"Promotion<{self.promo_code} - {self.discount}%>"
+        return f"{self.promo_code} - {self.discount_type} {self.discount_value}"
+    
+    def is_valid(self):
+        """Check if promotion is currently valid"""
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.start_date <= today <= self.end_date
     
 
 

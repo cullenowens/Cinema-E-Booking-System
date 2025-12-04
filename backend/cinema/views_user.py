@@ -332,6 +332,9 @@ class BookingCreateView(APIView):
 
     purpose is to do checkout process where user confirms seat selection.
 
+    uses Facade Pattern to coordinate the entire booking process
+    uses Factory Method Pattern to apply promotions
+
     Request body:
     {
         "showing_id": 42,
@@ -339,7 +342,12 @@ class BookingCreateView(APIView):
             {"seat_id": 5, "age_category": "Adult"},
             {"seat_id": 6, "age_category": "Child"},
             {"seat_id": 7, "age_category": "Senior"}
-        ]
+        ],
+        "promo_code": "SUMMER20",  # Optional
+        "payment_card_id": 3,  # Use saved card OR provide new card:
+        "card_number": "4532123456789012",
+        "expiration": "12/2026",
+        "brand": "Visa"
     }
     
     Response:
@@ -349,43 +357,58 @@ class BookingCreateView(APIView):
         "movie_title": "Inception",
         "showroom_name": "Theater 1",
         "start_time": "2025-11-15T19:30:00Z",
-        "tickets": [
-            {"seat_display": "A5", "age_category": "Adult", "price": 12.00},
-            {"seat_display": "A6", "age_category": "Child", "price": 8.00},
-            {"seat_display": "A7", "age_category": "Senior", "price": 10.00}
+        "seats": [
+            {"seat_display": "A5", "age_category": "Adult"},
+            {"seat_display": "A6", "age_category": "Child"}
         ],
-        "total_price": 30.00
+        "base_price": "$20.00",
+        "promotion_applied": "SUMMER20",
+        "discount_display": "20% off (-$4.00)",
+        "final_price": "$16.00",
+        "payment": {
+            "payment_method": "saved_card",
+            "last4": "9012",
+            "brand": "Visa"
+        },
+        "booking_time": "2025-12-03T10:30:00Z"
     }
     '''
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        """Create booking"""
+        """
+        creates a booking using BookingFacade
+        
+        the facade coordinates:
+        seat validation
+        price calculation
+        promotion application (Factory Method)
+        payment simulation
+        booking and ticket creation
+        """
         try:
-            # Validate and create booking
+            # validate and create booking using BookingCreateSerializer
+            # this serializer uses the BookingFacade internally
             serializer = BookingCreateSerializer(
                 data=request.data,
                 context={'request': request}
             )
             
             if not serializer.is_valid():
+                logger.warning(f"Booking validation failed: {serializer.errors}")
                 return Response(
                     serializer.errors,
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Create booking + tickets
+            # serializer.save() calls BookingFacade.process_booking()
+            # which returns the complete formatted result
             result = serializer.save()
-            booking = result['booking']
-            tickets = result['tickets']
             
-            # Return booking details
-            detail_serializer = BookingDetailSerializer(booking)
-
             logger.info(
-                f"Booking created: #{booking.booking_id} "
+                f"Booking created: #{result['booking_id']} "
                 f"by {request.user.username} "
-                f"with {len(tickets)} tickets"
+                f"for {result['final_price']}"
             )
             #booking confirmation email logic
             try:
@@ -451,15 +474,16 @@ class BookingCreateView(APIView):
                 pass  # continue even if email fails
 
             
+            # return the formatted result from Facade (not BookingDetailSerializer!)
             return Response(
-                detail_serializer.data,
+                result,
                 status=status.HTTP_201_CREATED
             )
         
         except Exception as e:
             logger.error(f"Error creating booking: {e}")
             return Response(
-                {"error": "Failed to create booking"},
+                {"error": "Failed to create booking. Please try again."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
