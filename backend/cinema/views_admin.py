@@ -537,25 +537,25 @@ class AdminPromotionCreateView(APIView):
             discount_text = f"${promotion.discount_value:.2f} OFF"
         
         message = f"""
-hello!
+Hello!
 
-we have an exciting promotion for you!
+We have an exciting promotion for you!
 
 promo code: {promotion.promo_code}
 discount: {discount_text}
 valid from: {promotion.start_date.strftime('%B %d, %Y')}
 valid until: {promotion.end_date.strftime('%B %d, %Y')}
 
-use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!
+Use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!
 
-don't miss out on this limited-time offer!
+Don't miss out on this limited-time offer!
 
-best regards,
-cinema e-booking team
+Best regards,
+Cinema e-booking team
 
 ---
-you're receiving this email because you subscribed to promotional offers
-to unsubscribe, please update your profile settings
+You're receiving this email because you subscribed to promotional offers
+to unsubscribe, please update your profile settings.
         """
         
         for user in subscribed_users:
@@ -733,25 +733,25 @@ class AdminPromotionEmailView(APIView):
                 discount_text = f"${promotion.discount_value:.2f} OFF"
             
             message = f"""
-hello!
+Hello!
 
-we have an exciting promotion for you!
+We have an exciting promotion for you!
 
 promo code: {promotion.promo_code}
 discount: {discount_text}
 valid from: {promotion.start_date.strftime('%B %d, %Y')}
 valid until: {promotion.end_date.strftime('%B %d, %Y')}
 
-use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!
+Use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!
 
-don't miss out on this limited-time offer!
+Don't miss out on this limited-time offer!
 
-best regards,
-cinema e-booking team
+Best regards,
+Cinema e-booking team
 
 ---
-you're receiving this email because you subscribed to promotional offers
-to unsubscribe, please update your profile settings
+You're receiving this email because you subscribed to promotional offers
+to unsubscribe, please update your profile settings.
             """
             
             for user in subscribed_users:
