@@ -89,7 +89,10 @@ const RegisterPage = () => {
 
       navigate("/signin");
     } else {
-      setMessage({ type: "error", text: res.error });
+      setMessage({
+        type: "error",
+        text: "Registration failed. Please try again later.",
+      });
     }
   };
 
