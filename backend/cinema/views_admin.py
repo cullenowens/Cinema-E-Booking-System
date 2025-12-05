@@ -16,6 +16,7 @@ from django.db.models import Q
 from datetime import datetime, timedelta
 from django.core.mail import send_mail
 from django.conf import settings
+import os
 
 from .models import Movie, Promotion, Profile, MovieShowtime, Genre, MovieGenre, Showroom, Showing
 from .serializers import MovieSerializer, PromotionSerializer, ShowingSerializer, ShowroomSerializer
@@ -562,7 +563,8 @@ to unsubscribe, please update your profile settings
                 send_mail(
                     subject=subject,
                     message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    #from_email=settings.DEFAULT_FROM_EMAIL,
+                    from_email=os.getenv("GMAIL_EMAIL"),
                     recipient_list=[user.email],
                     fail_silently=False,
                 )
