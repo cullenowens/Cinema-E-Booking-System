@@ -265,8 +265,10 @@ CREATE TABLE IF NOT EXISTS showings (
 CREATE TABLE IF NOT EXISTS bookings (
 	booking_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL,
+    promo_code VARCHAR(50),
     booking_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES auth_user(id)
+    FOREIGN KEY (user_id) REFERENCES auth_user(id) 
 );
 
 -- table for singular tickets
