@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
         username,
         email,
         password,
-        phone_number: phone,
+        phone,
         subscribed,
       });
       return { success: true };
