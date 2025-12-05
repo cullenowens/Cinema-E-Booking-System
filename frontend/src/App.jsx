@@ -15,6 +15,7 @@ import ManageMoviesPage from "./pages/ManageMoviesPage/ManageMoviesPage";
 import ManageShowtimesPage from "./pages/ManageShowtimesPage/ManageShowtimesPage";
 import ManagePromotionsPage from "./pages/ManagePromotionsPage/ManagePromotionsPage";
 import ManageUsersPage from "./pages/ManageUsersPage/ManageUsersPage";
+import OrderHistoryPage from "./pages/OrderHistoryPage/OrderHistoryPage";
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
             path="/admin/manage-showtimes"
             element={<ManageShowtimesPage />}
           />
+          <Route path="/order-history" element={<OrderHistoryPage />} />
         </Routes>
       </Router>
     </AuthProvider>

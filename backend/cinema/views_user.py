@@ -11,6 +11,9 @@ from django.utils import timezone
 from django.db.models import Q, Count
 from collections import defaultdict
 import logging
+import smtplib
+import os
+from dotenv import load_dotenv
 from datetime import datetime
 
 from .models import Showing, Showroom, Seat, Booking, Ticket, Movie
@@ -20,9 +23,10 @@ from .serializers import (
     SeatAvailabilitySerializer,
     BookingCreateSerializer,
     BookingDetailSerializer,
-    TicketSerializer
+    TicketSerializer,
+    PromotionFactory
 )
-
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Browse available showings 
@@ -323,6 +327,183 @@ class SeatAvailabilityView(APIView):
     
 # Booking views: create and manage bookings
 
+class BookingPreviewView(APIView):
+    '''
+    Preview booking total before confirming.
+    
+    purpose is user see order total with promo applied BEFORE creating booking
+    
+    POST /api/user/bookings/preview/
+    
+    Request body:
+    {
+        "showing_id": 13,
+        "seats": [
+            {"seat_id": 1, "age_category": "Adult"},
+            {"seat_id": 2, "age_category": "Child"}
+        ],
+        "promo_code": "SUMMER20"  # Optional
+    }
+    
+    Response:
+    {
+        "showing": {
+            "movie_title": "Minecraft",
+            "showroom_name": "Showroom A",
+            "start_time": "2025-12-11T19:30:00Z"
+        },
+        "seats": [
+            {"seat_display": "A1", "age_category": "Adult", "price": "$12.00"},
+            {"seat_display": "A2", "age_category": "Child", "price": "$8.00"}
+        ],
+        "base_price": "$20.00",
+        "promotion_applied": "SUMMER20",
+        "discount_display": "20% off",
+        "discount_amount": "$4.00",
+        "final_price": "$16.00"
+    }
+    '''
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        '''calculate booking total without creating booking'''
+        try:
+            from decimal import Decimal
+            from .models import Promotion
+            
+            showing_id = request.data.get('showing_id')
+            seat_data = request.data.get('seats', [])
+            promo_code = request.data.get('promo_code')
+            
+            # validate showing exists
+            try:
+                showing = Showing.objects.select_related('movie', 'showroom').get(showing_id=showing_id)
+            except Showing.DoesNotExist:
+                return Response(
+                    {'error': 'Showing not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # validate seats exist and are available
+            seat_ids = [s['seat_id'] for s in seat_data]
+            seats = Seat.objects.filter(seat_id__in=seat_ids)
+            
+            if len(seats) != len(seat_ids):
+                return Response(
+                    {'error': 'One or more seats not found'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # verify all seats belong to the showing's showroom
+            for seat in seats:
+                if seat.showroom_id_id != showing.showroom_id:
+                    return Response(
+                        {'error': f'Seat {seat.seat_id} does not belong to this showroom'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # check if seats are available (check if any tickets exist for these seats in this showing)
+            occupied_seat_ids = Ticket.objects.filter(
+                seat_id__in=seat_ids,
+                showing_id=showing.showing_id
+            ).values_list('seat_id', flat=True)
+            
+            if occupied_seat_ids:
+                return Response(
+                    {'error': f'Seats already occupied: {list(occupied_seat_ids)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # calculate base price
+            base_price = Decimal('0.00')
+            seat_details = []
+            
+            for seat_info in seat_data:
+                seat = seats.get(seat_id=seat_info['seat_id'])
+                age_category = seat_info['age_category']
+                
+                # get ticket price based on age category
+                if age_category == 'Adult':
+                    price = Decimal('12.00')
+                elif age_category == 'Child':
+                    price = Decimal('8.00')
+                elif age_category == 'Senior':
+                    price = Decimal('10.00')
+                else:
+                    return Response(
+                        {'error': f'Invalid age category: {age_category}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                base_price += price
+                seat_details.append({
+                    'seat_display': f"{seat.row_label}{seat.seat_number}",
+                    'age_category': age_category,
+                    'price': f"${price:.2f}"
+                })
+            
+            # apply promotion if provided
+            discount_amount = Decimal('0.00')
+            discount_display = None
+            promotion_applied = None
+            
+            if promo_code:
+                try:
+                    promotion = Promotion.objects.get(
+                        promo_code=promo_code,
+                        start_date__lte=timezone.now().date(),
+                        end_date__gte=timezone.now().date()
+                    )
+                    
+                    # use Factory Method to create promotion handler
+                    promo_handler = PromotionFactory.get_promotion(promo_code)
+                    
+                    # Convert Decimal to float for promotion calculation
+                    base_price_float = float(base_price)
+                    final_price_after_promo = promo_handler.apply(base_price_float)
+                    discount_amount = Decimal(str(base_price_float - final_price_after_promo))
+                    discount_display = promo_handler.get_discount_display(base_price_float)
+                    promotion_applied = promo_code
+                    
+                    logger.info(f"Preview: Applied promo '{promo_code}' - {discount_display}")
+                    
+                except Promotion.DoesNotExist:
+                    return Response(
+                        {'error': 'Invalid or expired promotion code'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            final_price = base_price - discount_amount
+            
+            # build response
+            response_data = {
+                'showing': {
+                    'movie_title': showing.movie.movie_title,
+                    'showroom_name': showing.showroom.showroom_name,
+                    'start_time': showing.start_time.isoformat()
+                },
+                'seats': seat_details,
+                'base_price': f"${base_price:.2f}",
+                'final_price': f"${final_price:.2f}"
+            }
+            
+            # add promotion details if applied
+            if promotion_applied:
+                response_data['promotion_applied'] = promotion_applied
+                response_data['discount_display'] = discount_display
+                response_data['discount_amount'] = f"${discount_amount:.2f}"
+            
+            logger.info(f"Booking preview for user {request.user.username}: Base ${base_price}, Final ${final_price}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Booking preview error: {str(e)}")
+            return Response(
+                {'error': f'Preview failed: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 class BookingCreateView(APIView):
     '''
     creates a new booking with tickets.
@@ -402,11 +583,88 @@ class BookingCreateView(APIView):
             # which returns the complete formatted result
             result = serializer.save()
             
+            #get the actual booking and tickets from database
+            booking = Booking.objects.get(booking_id=result['booking_id'])
+            tickets = Ticket.objects.filter(booking=booking)
+            
             logger.info(
                 f"Booking created: #{result['booking_id']} "
                 f"by {request.user.username} "
                 f"for {result['final_price']}"
             )
+            #booking confirmation email logic
+            try:
+                user = request.user
+                
+                #get booking details from first ticket
+                movie_title = tickets[0].showing.movie.movie_title
+                showroom_name = tickets[0].showing.showroom.showroom_name
+                start_time = tickets[0].showing.start_time.strftime("%Y-%m-%d %H:%M")
+                #build ticket list with prices from age category
+                ticket_details = []
+                ticket_prices = {'Adult': 12.00, 'Child': 8.00, 'Senior': 10.00}
+                for ticket in tickets:
+                    price = ticket_prices.get(ticket.age_category, 12.00)
+                    ticket_details.append(
+                        f"Seat: {ticket.seat.__str__()}, Category: {ticket.age_category}, Price: ${price:.2f}"
+                    )
+                ticket_list = "\n".join(ticket_details)
+                
+                promo_info = ""
+                if result.get('promotion_applied'):
+                    promo_info = (
+                        f"\nPROMO CODE APPLIED: {result['promotion_applied']}\n"
+                        f"Discount: {result['discount_display']}\n"
+                    )
+                
+                #email sending
+                #smtp session created
+                s = smtplib.SMTP('smtp.gmail.com', 587)
+                #start TLS for security
+                s.starttls()
+
+                # Get Gmail credentials from environment variables
+                gmail_email = os.getenv("GMAIL_EMAIL")
+                gmail_password = os.getenv("GMAIL_PASS")
+
+                #authentication
+                print(f"Gmail email: {gmail_email}")
+                print(f"Gmail password loaded: {'Yes' if gmail_password else 'No'}")
+
+                # login to gmail
+                s.login(gmail_email, gmail_password)
+                #email message
+                message = (
+                    f"Subject: Booking Confirmation - {movie_title}\n\n"
+                    f"Hello {user.username},\n\n"
+                    f"Thank you for your booking with Cinema E-Booking System!\n\n"
+                    f"Your booking has been confirmed. Here are your details:\n\n"
+                    f"BOOKING CONFIRMATION\n"
+                    f"==========================================\n"
+                    f"Booking ID: #{booking.booking_id}\n"
+                    f"Movie: {movie_title}\n"
+                    f"Theater: {showroom_name}\n"
+                    f"Showtime: {start_time}\n\n"
+                    f"YOUR TICKETS:\n"
+                    f"{ticket_list}\n"
+                    f"\nBase Price: {result['base_price']}"
+                    f"{promo_info}"
+                    f"\nFINAL PRICE: {result['final_price']}\n"
+                    f"==========================================\n\n"
+                    f"Please arrive 15 minutes before showtime.\n"
+                    f"Present this confirmation email or your Booking ID at the theater.\n\n"
+                    f"Need to make changes? Log in to your account to view or cancel your booking.\n\n"
+                    f"Enjoy the show!\n\n"
+                    f"Cinema E-Booking System Team"
+                )
+                #sends the mail
+                s.sendmail(gmail_email, user.email, message.encode('utf-8'))
+                s.quit()
+                print(f"Booking email sent to {user.email}")
+            except Exception as e:
+                print(f"Failed to send booking confirmation email: {e}")
+                logger.error(f"Failed to send booking confirmation email: {e}")
+                pass  # continue even if email fails
             
             # return the formatted result from Facade (not BookingDetailSerializer!)
             return Response(
@@ -467,7 +725,7 @@ class BookingListView(APIView):
             serializer = BookingDetailSerializer(bookings, many=True)
             
             logger.info(f"Retrieved {bookings.count()} bookings for {request.user.username}")
-            
+
             return Response({
                 'count': bookings.count(),
                 'bookings': serializer.data

@@ -437,20 +437,38 @@ class AdminPromotionListView(APIView):
             )
         
 class AdminPromotionCreateView(APIView):
-    """
-    Create a new promotion and optionally email it to subscribed users
+    '''
+    creates a new promotion and optionally emails it to subscribed users
+    
+    purpose is admin create promotional discount codes for users to apply at checkout
     
     POST /api/admin/promotions/create/
     
     Request body:
     {
         "promo_code": "SUMMER2026",
-        "discount": 20.00,
+        "discount_type": "percentage",  # "percentage" or "fixed"
+        "discount_value": 20.00,  # 20.00 for 20% OR $20 depending on discount_type
         "start_date": "2026-06-01",
         "end_date": "2026-08-31",
-        "send_email": true  // optional, defaults to false
+        "send_email": true  # optional, defaults to false
     }
-    """
+    
+    Response:
+    {
+        "message": "Promotion created successfully",
+        "promotion": {
+            "promo_id": 3,
+            "promo_code": "SUMMER2026",
+            "discount_type": "percentage",
+            "discount_value": 20.00,
+            "start_date": "2026-06-01",
+            "end_date": "2026-08-31"
+        },
+        "emails_sent": 45,
+        "email_message": "Promotion email sent to 45 subscribed users"
+    }
+    '''
     permission_classes = [IsAuthenticated, IsAdminUser]
     
     def post(self, request):
@@ -466,7 +484,8 @@ class AdminPromotionCreateView(APIView):
                 
                 logger.info(
                     f"Promotion created: {promotion.promo_code} "
-                    f"({promotion.discount}% off) by admin {request.user.username}"
+                    f"({promotion.discount_type}: {promotion.discount_value}) "
+                    f"by admin {request.user.username}"
                 )
                 
                 # Send emails to subscribed users if requested
@@ -499,8 +518,8 @@ class AdminPromotionCreateView(APIView):
             )
     
     def send_promotion_emails(self, promotion):
-        """Send promotion email to all subscribed users"""
-        # Get all users who are subscribed to promotions
+        """send promotion email to all subscribed users"""
+        # get all users who are subscribed to promotions
         subscribed_users = User.objects.filter(
             profile__subscribed=True,
             is_active=True
@@ -508,28 +527,34 @@ class AdminPromotionCreateView(APIView):
         
         emails_sent = 0
         
-        # Email subject and message
-        subject = f"🎉 Special Offer: {promotion.discount}% Off!"
+        # build email based on discount type
+        if promotion.discount_type == 'percentage':
+            subject = f"🎉 special offer: {promotion.discount_value:.0f}% off!"
+            discount_text = f"{promotion.discount_value:.0f}% OFF"
+        else:
+            subject = f"🎉 special offer: ${promotion.discount_value:.2f} off!"
+            discount_text = f"${promotion.discount_value:.2f} OFF"
+        
         message = f"""
-Hello!
+hello!
 
-We have an exciting promotion for you!
+we have an exciting promotion for you!
 
-Promo Code: {promotion.promo_code}
-Discount: {promotion.discount}% OFF
-Valid From: {promotion.start_date.strftime('%B %d, %Y')}
-Valid Until: {promotion.end_date.strftime('%B %d, %Y')}
+promo code: {promotion.promo_code}
+discount: {discount_text}
+valid from: {promotion.start_date.strftime('%B %d, %Y')}
+valid until: {promotion.end_date.strftime('%B %d, %Y')}
 
-Use code "{promotion.promo_code}" at checkout to get {promotion.discount}% off your ticket purchase!
+use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!
 
-Don't miss out on this limited-time offer!
+don't miss out on this limited-time offer!
 
-Best regards,
-Cinema E-Booking Team
+best regards,
+cinema e-booking team
 
 ---
-You're receiving this email because you subscribed to promotional offers.
-To unsubscribe, please update your profile settings.
+you're receiving this email because you subscribed to promotional offers
+to unsubscribe, please update your profile settings
         """
         
         for user in subscribed_users:
@@ -552,13 +577,25 @@ To unsubscribe, please update your profile settings.
         return emails_sent
     
 class AdminPromotionDetailView(APIView):
-    """
-    Get, update, or delete a specific promotion
+    '''
+    get, update, or delete a specific promotion
+    
+    purpose is admin manage existing promotional codes
     
     GET /api/admin/promotions/<id>/
+    
     PUT /api/admin/promotions/<id>/
+    Request body (all fields optional for partial update):
+    {
+        "promo_code": "UPDATED2026",
+        "discount_type": "fixed",
+        "discount_value": 15.00,
+        "start_date": "2026-06-01",
+        "end_date": "2026-09-30"
+    }
+    
     DELETE /api/admin/promotions/<id>/
-    """
+    '''
     permission_classes = [IsAuthenticated, IsAdminUser]
     
     def get(self, request, pk):
@@ -596,6 +633,7 @@ class AdminPromotionDetailView(APIView):
                 
                 logger.info(
                     f"Promotion updated: {updated_promotion.promo_code} "
+                    f"({updated_promotion.discount_type}: {updated_promotion.discount_value}) "
                     f"by admin {request.user.username}"
                 )
                 
@@ -648,19 +686,28 @@ class AdminPromotionDetailView(APIView):
             )
 
 class AdminPromotionEmailView(APIView):
-    """
-    Send existing promotion to subscribed users
+    '''
+    sends existing promotion email to all subscribed users
+    
+    purpose is admin manually trigger promotion email for existing promo code
     
     POST /api/admin/promotions/<id>/send-email/
-    """
+    
+    Response:
+    {
+        "message": "Promotion email sent to 45 subscribed users",
+        "emails_sent": 45,
+        "total_subscribed": 50
+    }
+    '''
     permission_classes = [IsAuthenticated, IsAdminUser]
     
     def post(self, request, pk):
-        """Send promotion email to subscribed users"""
+        """send promotion email to subscribed users"""
         try:
             promotion = Promotion.objects.get(pk=pk)
             
-            # Get subscribed users
+            # get subscribed users
             subscribed_users = User.objects.filter(
                 profile__subscribed=True,
                 is_active=True
@@ -668,33 +715,41 @@ class AdminPromotionEmailView(APIView):
             
             if subscribed_users.count() == 0:
                 return Response({
-                    'message': 'No subscribed users to send email to',
+                    'message': 'no subscribed users to send email to',
                     'emails_sent': 0
                 }, status=status.HTTP_200_OK)
             
-            # Send emails
+            # send emails
             emails_sent = 0
-            subject = f"🎉 Special Offer: {promotion.discount}% Off!"
+            
+            # build email based on discount type
+            if promotion.discount_type == 'percentage':
+                subject = f"🎉 special offer: {promotion.discount_value:.0f}% off!"
+                discount_text = f"{promotion.discount_value:.0f}% OFF"
+            else:
+                subject = f"🎉 special offer: ${promotion.discount_value:.2f} off!"
+                discount_text = f"${promotion.discount_value:.2f} OFF"
+            
             message = f"""
-Hello!
+hello!
 
-We have an exciting promotion for you!
+we have an exciting promotion for you!
 
-Promo Code: {promotion.promo_code}
-Discount: {promotion.discount}% OFF
-Valid From: {promotion.start_date.strftime('%B %d, %Y')}
-Valid Until: {promotion.end_date.strftime('%B %d, %Y')}
+promo code: {promotion.promo_code}
+discount: {discount_text}
+valid from: {promotion.start_date.strftime('%B %d, %Y')}
+valid until: {promotion.end_date.strftime('%B %d, %Y')}
 
-Use code "{promotion.promo_code}" at checkout to get {promotion.discount}% off your ticket purchase!
+use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!
 
-Don't miss out on this limited-time offer!
+don't miss out on this limited-time offer!
 
-Best regards,
-Cinema E-Booking Team
+best regards,
+cinema e-booking team
 
 ---
-You're receiving this email because you subscribed to promotional offers.
-To unsubscribe, please update your profile settings.
+you're receiving this email because you subscribed to promotional offers
+to unsubscribe, please update your profile settings
             """
             
             for user in subscribed_users:

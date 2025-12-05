@@ -42,12 +42,13 @@ const SignInPage = () => {
     if (!validateForm()) return;
 
     const result = await login(username, password);
-    navigate("/");
     if (!result.success) {
       setMessage({
         type: "error",
         text: result.error || "Invalid username or password",
       });
+    } else {
+      navigate("/");
     }
   };
 
@@ -71,21 +72,20 @@ const SignInPage = () => {
     });
 
     try {
-      const res = await forgotPassword(forgotEmail);  // Add await here
+      const res = await forgotPassword(forgotEmail); // Add await here
       console.log("Password reset response:", res);
-      
+
       setMessage({
         type: "success",
         text: "Password reset code has been sent to your email.",
       });
-  
+
       setTimeout(() => {
         setShowForgotPassword(false);
         setForgotEmail("");
         setMessage({ type: "", text: "" });
-        navigate("/reset-password");  // Navigate to reset password page, not forgot-password
+        navigate("/reset-password"); // Navigate to reset password page, not forgot-password
       }, 3000);
-      
     } catch (error) {
       console.error("Password reset error:", error);
       setMessage({
