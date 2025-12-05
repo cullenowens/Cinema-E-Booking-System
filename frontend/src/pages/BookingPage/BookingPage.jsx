@@ -211,7 +211,9 @@ const BookingPage = () => {
 
       const res = await createBooking(bookingPayload);
       alert("Booking confirmed! Check your email.");
-      navigate("/profile");
+      if (res && res.booking_id) {
+        navigate(`/booking-confirmation/${res.booking_id}`);
+      }
     } catch (err) {
       console.error("Booking failed", err);
       const msg =
