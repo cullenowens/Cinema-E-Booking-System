@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from django.core.mail import send_mail
 from django.conf import settings
 import os
+import smtplib
 
 from .models import Movie, Promotion, Profile, MovieShowtime, Genre, MovieGenre, Showroom, Showing
 from .serializers import MovieSerializer, PromotionSerializer, ShowingSerializer, ShowroomSerializer
@@ -530,52 +531,62 @@ class AdminPromotionCreateView(APIView):
         
         # build email based on discount type
         if promotion.discount_type == 'percentage':
-            subject = f"🎉 special offer: {promotion.discount_value:.0f}% off!"
             discount_text = f"{promotion.discount_value:.0f}% OFF"
         else:
-            subject = f"🎉 special offer: ${promotion.discount_value:.2f} off!"
             discount_text = f"${promotion.discount_value:.2f} OFF"
         
-        message = f"""
-hello!
-
-we have an exciting promotion for you!
-
-promo code: {promotion.promo_code}
-discount: {discount_text}
-valid from: {promotion.start_date.strftime('%B %d, %Y')}
-valid until: {promotion.end_date.strftime('%B %d, %Y')}
-
-use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!
-
-don't miss out on this limited-time offer!
-
-best regards,
-cinema e-booking team
-
----
-you're receiving this email because you subscribed to promotional offers
-to unsubscribe, please update your profile settings
-        """
+        # Get Gmail credentials from environment variables
+        gmail_email = os.getenv("GMAIL_EMAIL")
+        gmail_password = os.getenv("GMAIL_PASS")
+        
+        print(f"Gmail email: {gmail_email}")
+        print(f"Gmail password loaded: {'Yes' if gmail_password else 'No'}")
         
         for user in subscribed_users:
             try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    #from_email=settings.DEFAULT_FROM_EMAIL,
-                    from_email=os.getenv("GMAIL_EMAIL"),
-                    recipient_list=[user.email],
-                    fail_silently=False,
+                # email sending - SMTP session created
+                s = smtplib.SMTP('smtp.gmail.com', 587)
+                # start TLS for security
+                s.starttls()
+                
+                # authentication and login to gmail
+                s.login(gmail_email, gmail_password)
+                
+                # email message
+                message = (
+                    f"Subject: 🎉 Special Offer: {discount_text}!\n\n"
+                    f"Hello {user.username}!\n\n"
+                    f"We have an exciting promotion for you!\n\n"
+                    f"PROMOTION DETAILS\n"
+                    f"==========================================\n"
+                    f"Promo Code: {promotion.promo_code}\n"
+                    f"Discount: {discount_text}\n"
+                    f"Valid From: {promotion.start_date.strftime('%B %d, %Y')}\n"
+                    f"Valid Until: {promotion.end_date.strftime('%B %d, %Y')}\n"
+                    f"==========================================\n\n"
+                    f"Use code \"{promotion.promo_code}\" at checkout to save on your ticket purchase!\n\n"
+                    f"Don't miss out on this limited-time offer!\n\n"
+                    f"Best regards,\n"
+                    f"Cinema E-Booking System Team\n\n"
+                    f"---\n"
+                    f"You're receiving this email because you subscribed to promotional offers.\n"
+                    f"To unsubscribe, please update your profile settings."
                 )
+                # sends the mail
+                s.sendmail(gmail_email, user.email, message.encode('utf-8'))
+                s.quit()
+
                 emails_sent += 1
+                print(f"Promotion email sent to {user.email}")
                 logger.info(f"Promotion email sent to {user.email}")
+
             except Exception as e:
-                logger.error(f"Failed to send email to {user.email}: {e}")
-                continue
+                print(f"Failed to send promotion email to {user.email}: {e}")
+                logger.error(f"Failed to send promotion email to {user.email}: {e}")
+                continue  # continue even if email fails
         
         logger.info(f"Promotion emails sent: {emails_sent} out of {subscribed_users.count()} subscribed users")
-        
+            
         return emails_sent
     
 class AdminPromotionDetailView(APIView):
