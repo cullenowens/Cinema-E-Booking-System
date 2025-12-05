@@ -16,6 +16,7 @@ import ManageShowtimesPage from "./pages/ManageShowtimesPage/ManageShowtimesPage
 import ManagePromotionsPage from "./pages/ManagePromotionsPage/ManagePromotionsPage";
 import ManageUsersPage from "./pages/ManageUsersPage/ManageUsersPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage/OrderHistoryPage";
+import BookingConfirmationPage from "./pages/BookingConfirmationPage/BookingConfirmationPage";
 
 function App() {
   return (
@@ -45,6 +46,10 @@ function App() {
             element={<ManageShowtimesPage />}
           />
           <Route path="/order-history" element={<OrderHistoryPage />} />
+          <Route
+            path="/booking-confirmation/:bookingId"
+            element={<BookingConfirmationPage />}
+          />
         </Routes>
       </Router>
     </AuthProvider>

@@ -290,3 +290,11 @@ export const getBookings = async () => {
   });
   return res.data;
 };
+
+export const getBooking = async (bookingId) => {
+  const token = localStorage.getItem("accessToken");
+  const res = await axios.get(`${url}/user/bookings/${bookingId}/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
