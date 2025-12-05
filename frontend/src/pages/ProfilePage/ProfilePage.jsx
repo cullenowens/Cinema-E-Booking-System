@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import Navbar from "../../components/Navbar/Navbar";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   getAddress,
   updateAddress,
@@ -26,6 +27,8 @@ const ProfilePage = () => {
   });
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -38,7 +41,26 @@ const ProfilePage = () => {
     const fetchData = async () => {
       if (user) {
         try {
-          const addressData = await getAddress();
+          setLoading(true);
+
+          // Try to fetch address, but don't fail if it doesn't exist
+          let addressData = {
+            street: "",
+            city: "",
+            state: "",
+            zip_code: "",
+          };
+
+          try {
+            addressData = await getAddress();
+          } catch (addressError) {
+            // Address doesn't exist yet - use empty defaults
+            if (addressError.response?.status !== 404) {
+              // If it's not a 404, it's a real error
+              console.error("Error fetching address:", addressError);
+            }
+          }
+
           setFormData({
             username: user.username || "",
             firstName: user.first_name || "",
@@ -50,8 +72,13 @@ const ProfilePage = () => {
             zipCode: addressData.zip_code || "",
             promotions: user.subscribed || false,
           });
+
+          setError(null);
         } catch (error) {
-          console.log(error.response?.data);
+          console.error("Error loading profile:", error);
+          setError("Failed to load profile data. Please refresh the page.");
+        } finally {
+          setLoading(false);
         }
       }
     };
@@ -70,29 +97,51 @@ const ProfilePage = () => {
     e.preventDefault();
 
     try {
-      // Pass first and last name to the API function
-      const result = await updateProfile({
+      await updateProfile({
         phone: formData.phone,
         subscribed: formData.promotions,
         firstName: formData.firstName,
         lastName: formData.lastName,
       });
 
-      // Use formData.address for the street field
-      const addressRes = await updateAddress({
-        street: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zip_code: formData.zipCode,
-      });
-
-      alert("Profile updated");
-    } catch (err) {
-      // Fix error variable naming (err vs error)
-      if (err.response && err.response.status === 404) {
-        // Handle address creation if it doesn't exist (optional logic)
+      // Try to update address, create if it doesn't exist
+      try {
+        await updateAddress({
+          street: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zipCode,
+        });
+      } catch (err) {
+        if (err.response?.status === 404) {
+          // Address doesn't exist, create it using POST
+          await axios.post(
+            "http://127.0.0.1:8000/api/auth/address/",
+            {
+              street: formData.address,
+              city: formData.city,
+              state: formData.state,
+              zip_code: formData.zipCode,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+              },
+            }
+          );
+        } else {
+          throw err; // Re-throw if it's a different error
+        }
       }
+
+      alert("Profile updated successfully");
+    } catch (err) {
       console.error("Error updating profile:", err);
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        "Failed to update profile. Please try again.";
+      alert(errorMsg);
     }
   };
 
@@ -119,6 +168,7 @@ const ProfilePage = () => {
         newPassword: "",
         confirmPassword: "",
       });
+      setShowPasswordModal(false);
     } catch (err) {
       console.error("Error updating password:", err.response);
       const errorMsg =
@@ -128,8 +178,6 @@ const ProfilePage = () => {
         "Failed to update password.";
       alert(errorMsg);
     }
-
-    setShowPasswordModal(false);
   };
 
   return (
@@ -141,150 +189,166 @@ const ProfilePage = () => {
             Profile Information
           </h1>
 
-          <form
-            onSubmit={handleSubmit}
-            className="bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700 space-y-6"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-gray-300 mb-2">Username</label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  readOnly
-                  className="w-full p-3 rounded-lg bg-gray-600 text-gray-300 cursor-not-allowed focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">First Name</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">Last Name</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">Phone Number</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">Home Address</label>
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">City</label>
-                <input
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">State</label>
-                <input
-                  type="text"
-                  name="state"
-                  value={formData.state}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">ZIP Code</label>
-                <input
-                  type="text"
-                  name="zipCode"
-                  value={formData.zipCode}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+          {error && (
+            <div className="bg-red-600 text-white p-4 rounded-lg mb-4 text-center">
+              {error}
             </div>
+          )}
 
-            <div className="flex items-center mt-4">
-              <input
-                type="checkbox"
-                name="promotions"
-                checked={formData.promotions}
-                onChange={handleChange}
-                className="w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-              />
-              <label className="ml-3 text-gray-300">
-                Register for promotions?
-              </label>
+          {loading ? (
+            <div className="bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700 text-center">
+              <div className="text-white text-xl">Loading profile...</div>
             </div>
+          ) : (
+            <form
+              onSubmit={handleSubmit}
+              className="bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700 space-y-6"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-gray-300 mb-2">Username</label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={formData.username}
+                    readOnly
+                    className="w-full p-3 rounded-lg bg-gray-600 text-gray-300 cursor-not-allowed focus:outline-none"
+                  />
+                </div>
 
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-8">
-              <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordModal(true)}
-                  className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200"
-                >
-                  Change Password
-                </button>
+                <div>
+                  <label className="block text-gray-300 mb-2">First Name</label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => navigate("/payment-methods")}
-                  className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200"
-                >
-                  Add Credit Card
-                </button>
+                <div>
+                  <label className="block text-gray-300 mb-2">Last Name</label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2">
+                    Home Address
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2">City</label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2">State</label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleChange}
+                    className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2">ZIP Code</label>
+                  <input
+                    type="text"
+                    name="zipCode"
+                    value={formData.zipCode}
+                    onChange={handleChange}
+                    className="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200"
-                >
-                  Log Out
-                </button>
-
-                <button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200"
-                >
-                  Save Changes
-                </button>
+              <div className="flex items-center mt-4">
+                <input
+                  type="checkbox"
+                  name="promotions"
+                  checked={formData.promotions}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                />
+                <label className="ml-3 text-gray-300">
+                  Register for promotions?
+                </label>
               </div>
-            </div>
-          </form>
+
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-8">
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordModal(true)}
+                    className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200"
+                  >
+                    Change Password
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate("/payment-methods")}
+                    className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200"
+                  >
+                    Add Credit Card
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200"
+                  >
+                    Log Out
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 

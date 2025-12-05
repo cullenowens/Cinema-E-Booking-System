@@ -45,6 +45,12 @@ const PaymentPage = () => {
       return;
     }
 
+    const expRegex = /^(0[1-9]|1[0-2])\/([0-9]{4}|[0-9]{2})$/; // Matches MM/YY or MM/YYYY
+    if (!expRegex.test(formData.expiration)) {
+      alert("Expiration must be in MM/YYYY format (e.g. 05/2026)");
+      return;
+    }
+
     try {
       const payload = {
         brand: formData.brand,
