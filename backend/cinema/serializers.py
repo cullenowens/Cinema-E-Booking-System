@@ -398,7 +398,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     #receives data from frontend for registration and validates it
     password = serializers.CharField(write_only=True)
     subscribed = serializers.BooleanField(write_only=True, required=False, default=False)
-    phone = serializers.CharField(required=True)
+    phone = serializers.CharField(required=True, write_only=True)
 
 
     class Meta:

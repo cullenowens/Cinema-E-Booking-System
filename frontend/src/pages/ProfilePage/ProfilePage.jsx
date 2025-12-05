@@ -11,7 +11,7 @@ import {
 } from "../../api";
 
 const ProfilePage = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, checkAuth } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -135,6 +135,8 @@ const ProfilePage = () => {
       }
 
       alert("Profile updated successfully");
+      // Refresh user data
+      await checkAuth();
     } catch (err) {
       console.error("Error updating profile:", err);
       const errorMsg =
