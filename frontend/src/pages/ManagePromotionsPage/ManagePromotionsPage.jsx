@@ -20,9 +20,10 @@ const ManagePromotionsPage = () => {
   const [formData, setFormData] = useState({
     promo_code: "",
     discount: "",
+    discount_type: "percentage", // Account for both types
     start_date: "",
     end_date: "",
-    send_email: false, // Checkbox for immediate email
+    send_email: false,
   });
 
   const [errors, setErrors] = useState({});
@@ -63,9 +64,18 @@ const ManagePromotionsPage = () => {
     const newErrors = {};
     if (!formData.promo_code.trim())
       newErrors.promo_code = "Promo Code is required";
-    if (!formData.discount) newErrors.discount = "Discount is required";
-    else if (formData.discount <= 0 || formData.discount > 100)
-      newErrors.discount = "Discount must be between 1% and 100%";
+
+    if (!formData.discount) {
+      newErrors.discount = "Discount value is required";
+    } else {
+      const val = parseFloat(formData.discount);
+      if (val <= 0) {
+        newErrors.discount = "Discount must be greater than 0";
+      } else if (formData.discount_type === "percentage" && val > 100) {
+        newErrors.discount = "Percentage discount cannot exceed 100%";
+      }
+    }
+
     if (!formData.start_date) newErrors.start_date = "Start Date is required";
     if (!formData.end_date) newErrors.end_date = "End Date is required";
 
@@ -85,7 +95,8 @@ const ManagePromotionsPage = () => {
     try {
       const payload = {
         promo_code: formData.promo_code,
-        discount: parseFloat(formData.discount),
+        discount_value: parseFloat(formData.discount),
+        discount_type: formData.discount_type, // Use selected type
         start_date: formData.start_date,
         end_date: formData.end_date,
         send_email: formData.send_email,
@@ -103,6 +114,7 @@ const ManagePromotionsPage = () => {
       setFormData({
         promo_code: "",
         discount: "",
+        discount_type: "percentage", // Reset to default
         start_date: "",
         end_date: "",
         send_email: false,
@@ -113,7 +125,6 @@ const ManagePromotionsPage = () => {
       const msg = error.response?.data?.error || "Failed to create promotion.";
       setNotification({ type: "error", message: msg });
 
-      // Map backend validation errors if available
       if (error.response?.data?.details) {
         setErrors(error.response.data.details);
       }
@@ -153,10 +164,14 @@ const ManagePromotionsPage = () => {
     }
   };
 
-  // Helper to format percentage
-  const formatPercent = (val) => {
-    // remove trailing zeros
-    return parseFloat(val) + "%";
+  // Helper to format discount based on type
+  const formatDiscount = (promo) => {
+    const val = parseFloat(promo.discount_value);
+    if (promo.discount_type === "percentage") {
+      return val + "%";
+    } else {
+      return "$" + val.toFixed(2);
+    }
   };
 
   return (
@@ -224,7 +239,7 @@ const ManagePromotionsPage = () => {
                           {promo.promo_code}
                         </td>
                         <td className="p-4 font-semibold">
-                          {formatPercent(promo.discount)}
+                          {formatDiscount(promo)}
                         </td>
                         <td className="p-4 text-gray-300">
                           {promo.start_date}
@@ -291,19 +306,67 @@ const ManagePromotionsPage = () => {
                   )}
                 </div>
 
-                {/* Discount */}
+                {/* Discount Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Discount Percentage (%) *
+                    Discount Type *
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label
+                      className={`cursor-pointer border rounded-lg p-3 text-center transition-colors ${
+                        formData.discount_type === "percentage"
+                          ? "bg-blue-600 border-blue-500"
+                          : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="discount_type"
+                        value="percentage"
+                        checked={formData.discount_type === "percentage"}
+                        onChange={handleInputChange}
+                        className="hidden"
+                      />
+                      Percentage (%)
+                    </label>
+                    <label
+                      className={`cursor-pointer border rounded-lg p-3 text-center transition-colors ${
+                        formData.discount_type === "fixed"
+                          ? "bg-blue-600 border-blue-500"
+                          : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="discount_type"
+                        value="fixed"
+                        checked={formData.discount_type === "fixed"}
+                        onChange={handleInputChange}
+                        className="hidden"
+                      />
+                      Fixed Amount ($)
+                    </label>
+                  </div>
+                </div>
+
+                {/* Discount Value */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Discount Value{" "}
+                    {formData.discount_type === "percentage" ? "(%)" : "($)"} *
                   </label>
                   <input
                     type="number"
                     name="discount"
                     value={formData.discount}
                     onChange={handleInputChange}
-                    placeholder="20"
-                    min="1"
-                    max="100"
+                    placeholder={
+                      formData.discount_type === "percentage" ? "20" : "5.00"
+                    }
+                    min="0"
+                    step={
+                      formData.discount_type === "percentage" ? "1" : "0.01"
+                    }
                     className="w-full px-4 py-2 bg-gray-700 rounded-lg text-white focus:ring-2 focus:ring-red-500 border border-gray-600"
                   />
                   {errors.discount && (
